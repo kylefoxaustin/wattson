@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "wattson/activity-vector/v1",
+  "title": "wattson activity vector",
+  "description": "DERIVED functional-activity counts from a QEMU run. NOT measured silicon power, NOT watts. The activity (alpha) half of P = sum(energy_per_event * event_count); the energy half is supplied by the power team's model.",
+  "type": "object",
+  "required": ["schema", "workload", "provenance", "activity"],
+  "properties": {
+    "schema": { "const": "wattson/activity-vector/v1" },
+    "workload": { "type": "string", "description": "workload label" },
+    "provenance": {
+      "type": "string",
+      "description": "must state DERIVED-from-QEMU; never 'measured silicon'"
+    },
+    "note": { "type": "string" },
+    "activity": {
+      "type": "object",
+      "required": ["cores"],
+      "properties": {
+        "cores": {
+          "type": "object",
+          "properties": {
+            "count_seen": { "type": "integer" },
+            "count_active": { "type": "integer" },
+            "insns_by_cpu": {
+              "type": "object",
+              "description": "cpu index -> instructions retired (active cores only)",
+              "additionalProperties": { "type": "integer" }
+            },
+            "total_insns": { "type": ["integer", "null"] },
+            "active_fraction_by_cpu": {
+              "type": "object",
+              "description": "P1: cpu index -> active/(active+halted) duty cycle in [0,1]",
+              "additionalProperties": { "type": "number" }
+            }
+          }
+        },
+        "memory": {
+          "type": "object",
+          "description": "from the functional cache plugin; misses are the DRAM-transaction proxy",
+          "properties": {
+            "data_accesses": { "type": "integer" },
+            "data_misses": { "type": "integer" },
+            "dmiss_rate": { "type": "number" },
+            "insn_accesses": { "type": "integer" },
+            "insn_misses": { "type": "integer" },
+            "imiss_rate": { "type": "number" },
+            "dram_transactions_est": { "type": "integer" },
+            "dram_bytes_est": { "type": "integer" },
+            "line_bytes": { "type": "integer" }
+          }
+        },
+        "accelerators": {
+          "type": "object",
+          "description": "P1+: modeled-block name -> active-cycle fraction in [0,1] (duty cycle; compute is faked but invocation timing is real)",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "active_fraction": { "type": "number" },
+              "jobs": { "type": "integer" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

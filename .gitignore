@@ -1,0 +1,7 @@
+# build intermediates (rebuildable via workloads/Makefile)
+*.o
+*.elf
+# local run logs / scratch
+*.plugin.txt
+*.log
+__pycache__/

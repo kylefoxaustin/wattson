@@ -1,0 +1,27 @@
+{
+  "schema": "wattson/activity-vector/v1",
+  "workload": "bench-alu",
+  "provenance": "DERIVED (QEMU TCG functional counters; NOT measured silicon)",
+  "note": "compute-bound: register-only integer churn",
+  "activity": {
+    "cores": {
+      "count_seen": 8,
+      "count_active": 1,
+      "insns_by_cpu": {
+        "0": 2684354571
+      },
+      "total_insns": 2684354571
+    },
+    "memory": {
+      "data_accesses": 5,
+      "data_misses": 3,
+      "dmiss_rate": 0.6,
+      "insn_accesses": 2684354571,
+      "insn_misses": 2,
+      "imiss_rate": 0.0,
+      "dram_transactions_est": 5,
+      "dram_bytes_est": 320,
+      "line_bytes": 64
+    }
+  }
+}
