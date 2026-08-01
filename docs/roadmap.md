@@ -7,10 +7,12 @@
 - [x] `parse_activity.py` → versioned activity-vector JSON (`schema/`).
 - [x] Real sample vectors that discriminate compute vs memory (`samples/`).
 
-## P1 — calibrate on i.MX95 · **blocked on instrumented board (~2 weeks)**
-- [ ] Per-rail silicon power via PAC1934 + BCU (`calibrate/power-measurement.md`).
-- [ ] Workload suite spanning the activity space (idle / compute / memory / mixed
-      real app / accelerator).
+## P1 — calibrate on the IMX95LPD5EVK-19 · **blocked on the EVK (~2 weeks)**
+- [ ] Per-rail silicon power via BCU on the EVK (`calibrate/power-measurement.md`);
+      FRDM-PRO has no power circuits, so calibration uses the EVK.
+- [ ] Reuse the **AN14449SW** suite (CoreMark / Dhrystone / Stream / memcpy /
+      memset + a/v + GLMark) so results cross-check against NXP's measured Table 4
+      (`calibrate/reference-an14449.md`); add idle + a mixed real app.
 - [ ] Instruction-class breakdown (add the `howvec` classifier plugin) so ALU vs
       load/store vs FP/NEON get distinct energy coefficients.
 - [ ] Core duty-cycle (active vs WFI) via an `-icount` timeline.

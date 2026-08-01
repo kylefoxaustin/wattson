@@ -103,11 +103,15 @@ actually streams. The cache model is behaving physically.
 
 ## Next: calibration (P1)
 
-Waiting on an i.MX95 board instrumented for **per-rail power**. Good news — the
-i.MX95 EVK/FRDM already carries **PAC1934** power monitors read over FTDI-I2C by
-NXP's open-source **BCU** tool, with rails including `vdd_arm` (A55 cores) and the
-`lpd5_*` LPDDR5 group — a near-perfect match for wattson's CPU and DRAM activity.
-See [`calibrate/power-measurement.md`](calibrate/power-measurement.md).
+The calibration board is the **IMX95LPD5EVK-19** (the FRDM-IMX95-PRO has no
+power-measurement circuits). It carries on-board per-rail monitors read host-side
+by NXP's open-source **BCU** tool — rails including **`vdd_arm`** (A55 cores) and
+the **`lpd5_*`** LPDDR5 group, a near-perfect match for wattson's CPU and DRAM
+activity. NXP's app note **AN14449** is the authoritative rail map + procedure, and
+**AN14449SW** ships the exact calibration workloads (CoreMark, Dhrystone, Stream,
+memcpy/memset) — which our `bench-alu`/`bench-mem` already mirror. See
+[`calibrate/power-measurement.md`](calibrate/power-measurement.md) and the SOURCED
+measured anchor in [`calibrate/reference-an14449.md`](calibrate/reference-an14449.md).
 
 ---
 
