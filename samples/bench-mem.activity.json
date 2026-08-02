@@ -2,7 +2,7 @@
   "schema": "wattson/activity-vector/v1",
   "workload": "bench-mem",
   "provenance": "DERIVED (QEMU TCG functional counters; NOT measured silicon)",
-  "note": "memory-bound: 256MiB stream x4",
+  "note": "256MiB stream x4",
   "activity": {
     "cores": {
       "count_seen": 8,
@@ -15,10 +15,10 @@
     "memory": {
       "data_accesses": 268435461,
       "data_misses": 33554435,
-      "dmiss_rate": 0.125,
       "insn_accesses": 939524132,
       "insn_misses": 3,
-      "imiss_rate": 0.0,
+      "dmiss_rate": 0.1250000088475643,
+      "imiss_rate": 3.193105847759108e-09,
       "dram_transactions_est": 33554438,
       "dram_bytes_est": 2147484032,
       "line_bytes": 64

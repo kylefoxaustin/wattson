@@ -5,3 +5,6 @@
 *.plugin.txt
 *.log
 __pycache__/
+
+# xcheck build artifact
+xcheck/microbench

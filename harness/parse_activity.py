@@ -22,7 +22,14 @@ DEFAULT_LINE_BYTES = 64
 def parse(log_text, line_bytes):
     per_cpu = {}
     total_insns = None
-    cache = None
+    cache_sum = None       # libcache "sum" row (system mode, multi-core)
+    cache_rows = []        # libcache per-core rows (present in both modes)
+
+    # libcache row: <who> <daccess> <dmiss> <dmiss%>  <iaccess> <imiss> <imiss%>
+    # <who> is "sum" or a core index. linux-user mode has a single core row and
+    # NO sum line, so we fall back to aggregating the per-core rows.
+    cache_re = re.compile(
+        r"^(sum|\d+)\s+(\d+)\s+(\d+)\s+[\d.]+%\s+(\d+)\s+(\d+)\s+[\d.]+%")
 
     for line in log_text.splitlines():
         m = re.match(r"cpu (\d+) insns:\s+(\d+)", line)
@@ -33,18 +40,26 @@ def parse(log_text, line_bytes):
         if m:
             total_insns = int(m.group(1))
             continue
-        # libcache "sum" row:
-        #   sum  <daccess> <dmiss> <dmiss%>  <iaccess> <imiss> <imiss%>
-        m = re.match(r"sum\s+(\d+)\s+(\d+)\s+([\d.]+)%\s+(\d+)\s+(\d+)\s+([\d.]+)%", line)
+        m = cache_re.match(line)
         if m:
-            cache = {
-                "data_accesses": int(m.group(1)),
-                "data_misses": int(m.group(2)),
-                "dmiss_rate": float(m.group(3)) / 100.0,
+            row = {
+                "data_accesses": int(m.group(2)),
+                "data_misses": int(m.group(3)),
                 "insn_accesses": int(m.group(4)),
                 "insn_misses": int(m.group(5)),
-                "imiss_rate": float(m.group(6)) / 100.0,
             }
+            if m.group(1) == "sum":
+                cache_sum = row
+            else:
+                cache_rows.append(row)
+
+    cache = cache_sum
+    if cache is None and cache_rows:      # user mode: aggregate the per-core rows
+        cache = {k: sum(r[k] for r in cache_rows) for k in cache_rows[0]}
+    if cache is not None:
+        da, ia = cache["data_accesses"], cache["insn_accesses"]
+        cache["dmiss_rate"] = (cache["data_misses"] / da) if da else 0.0
+        cache["imiss_rate"] = (cache["insn_misses"] / ia) if ia else 0.0
 
     active = {str(c): n for c, n in sorted(per_cpu.items()) if n > 0}
     vector = {
