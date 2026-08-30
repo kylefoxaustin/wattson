@@ -1,0 +1,22 @@
+{
+ "schema": "wattson/xcheck-qemu/v1",
+ "workload": "sgmmt4",
+ "provenance": "DERIVED from QEMU TCG plugins (linux-user); NOT silicon",
+ "insns": 12647129243,
+ "l1d_access": 807375671,
+ "l1d_miss": 4992483,
+ "l1i_access": 4443287894,
+ "l1i_miss": 1345,
+ "l2_access": 4993828,
+ "l2_miss": 4077638,
+ "l3_access": 13247870,
+ "l3_miss": 11929954,
+ "wstream_stores": 119596706,
+ "wstream_dram_writes": 813089,
+ "wb_dram_writes": 8434175,
+ "wb_dirty_resident": 1213,
+ "dram_read_proxy": 11929954,
+ "dram_write_proxy": 9248477,
+ "dram_transactions_proxy": 12743043,
+ "dram_bytes_proxy": 815554752
+}

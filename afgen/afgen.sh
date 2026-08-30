@@ -20,19 +20,28 @@ PC="${PC:-$HOME/Documents/GitHub/95emulator/build-user/contrib/plugins/libcache.
 mkdir -p "$OUT"
 MDIR="$(cd "$(dirname "$MAN")" && pwd)"
 printf "label\tinsns\tdram_rd_txn_est\tdram_wr_txn_est\tdram_rd_bytes_est\tdram_wr_bytes_est\n" > "$OUT/SUMMARY.tsv"
+# Two-pass extraction: READS come from the prefetcher-enabled pass (models the
+# silicon prefetcher's DRAM traffic); WRITES come from the base pass (the
+# prefetcher's cache turnover inflates modelled writebacks -- known, recorded
+# in xcheck/RESULTS.md). Each quantity from the pass that models it best.
 grep -vE '^\s*(#|$)' "$MAN" | while read -r LABEL CMD; do
     echo "── $LABEL" >&2
-    LOG="$(mktemp)"
-    ( cd "$MDIR" && "$QEMU" -plugin "$PI" -plugin "$PC",$GEOM -d plugin $CMD >/dev/null 2>"$LOG" ) || \
+    LOG="$(mktemp)"; LOG2="$(mktemp)"
+    ( cd "$MDIR" && "$QEMU" -plugin "$PI" -plugin "$PC",$GEOM,$PF_ARGS -d plugin $CMD >/dev/null 2>"$LOG" ) || \
         { echo "   $LABEL FAILED (see $LOG)" >&2; continue; }
-    python3 - "$LOG" "$LABEL" "$LINE_BYTES" "$RD_CORRECTION" "$WR_CORRECTION" "$OUT" <<'PY'
+    ( cd "$MDIR" && "$QEMU" -plugin "$PI" -plugin "$PC",$GEOM -d plugin $CMD >/dev/null 2>"$LOG2" ) || \
+        { echo "   $LABEL FAILED pass2 (see $LOG2)" >&2; continue; }
+    python3 - "$LOG" "$LABEL" "$LINE_BYTES" "$RD_CORRECTION" "$WR_CORRECTION" "$OUT" "$LOG2" <<'PY'
 import sys, re, json, os
 log, label, line, rc, wc, out = open(sys.argv[1]).read(), sys.argv[2], int(sys.argv[3]), float(sys.argv[4]), float(sys.argv[5]), sys.argv[6]
+log2 = open(sys.argv[7]).read()
 insns = int(re.search(r"total insns:\s*(\d+)", log).group(1))
-w = re.search(r"wattson: l3_accesses=(\d+) l3_misses=(\d+) wstream_stores=(\d+) wstream_dram_writes=(\d+) wb_dram_writes=(\d+) wb_dirty_resident=(\d+)(?: pf_issued=(\d+) pf_dram_reads=(\d+))?", log)
-g = [int(x) if x else 0 for x in w.groups()]
-l3m, ws_wr, wb_wr, wb_res = g[1], g[3], g[4], g[5]
-rd_raw, wr_raw = l3m, ws_wr + wb_wr + wb_res
+def parse(l):
+    w = re.search(r"wattson: l3_accesses=(\d+) l3_misses=(\d+) wstream_stores=(\d+) wstream_dram_writes=(\d+) wb_dram_writes=(\d+) wb_dirty_resident=(\d+)(?: pf_issued=(\d+) pf_dram_reads=(\d+))?", l)
+    return [int(x) if x else 0 for x in w.groups()]
+g, g2 = parse(log), parse(log2)
+rd_raw = g[1]                       # prefetch pass: reads incl. prefetcher traffic
+wr_raw = g2[3] + g2[4] + g2[5]      # base pass: streaming + writebacks + resident
 af = {
  "schema": "wattson/activity-factors/v2", "app": label,
  "provenance": "DERIVED from QEMU linux-user TCG plugins; corrections are the xcheck-MEASURED bridges; NOT silicon measurements",

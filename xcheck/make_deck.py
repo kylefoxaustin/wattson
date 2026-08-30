@@ -97,7 +97,7 @@ tb(s,.9,6.8,11.5,.4,"Kyle Fox · measured on FRDM-IMX95 silicon + qemu-aarch64 T
 s=slide("Executive summary","Everything on one slide; the rest of the deck is evidence.")
 data=[
  ("Instruction activity, per core","0.98 – 1.06 across all 14 apps (0.997 on a 10.2 B-insn vision app)","VALIDATED — use as-is"),
- ("DRAM read traffic",f"proxy = {GM:.2f} × silicon, geo-spread ×/÷ {SD:.2f} (8 apps above noise floor)",f"USABLE — apply ×{1/GM:.2f}, carry ×/÷{SD:.2f}"),
+ ("DRAM read traffic","X4 prefetch model: proxy = 0.98 × silicon, ×/÷ 1.14 — the exit criterion met (was 0.81 ×/÷ 1.26)","USABLE — correction ~1.0"),
  ("DRAM-quiet classification",f"{len(QUIET)} low-traffic apps ({', '.join(QUIET)}) predicted quiet; silicon concurs","VALIDATED"),
  ("DRAM write traffic",f"proxy = {GW:.2f} × silicon, ×/÷ {SW:.2f} (X1 writeback model: streaming bursts + dirty evictions)",f"USABLE — apply ×{1/GW:.2f}"),
  ("Kernel activity","boot-differential harness live: sha256 kernel+system share MEASURED at 10.0% over user mode (noise floor ±60M insns/cpu stated)","MEASURABLE — X2a"),
@@ -179,6 +179,7 @@ mech=[
  ("bzip2 0.49","prefetcher over-fetch on semi-sequential patterns — silicon reads ~2× the demand traffic","prefetch model, or per-class factor","open, named"),
  ("writes 0.02–0.09 (v1)","scattered stores exit DRAM as dirty EVICTIONS, which no allocation-time count can see","X1: dirty-line set + last-level eviction counting","0.90 ×/÷ 1.09"),
  ("sgm-mt insns 1.23 @4T","OpenMP barrier SPIN — timing-dependent instructions, inflated by instrumentation skew","X3: OMP_WAIT_POLICY=passive (proven, not argued)","0.985; DRAM unmoved"),
+ ("reads 0.49–0.77 (under)","silicon prefetcher traffic the model never issued","X4: 8-stream table, miss-trained, strict +1, ramped depth","0.98 ×/÷ 1.14"),
 ]
 table(s,.6,1.6,12.1,(2.25,4.9,2.6,2.35),("observation","mechanism","fix","after"),mech,fsz=10,rh=0.56,bold_cols=(0,))
 tb(s,.6,5.75,12.1,.8,"The X1 row landed after this deck's first printing and proves the pattern: the named mechanism, implemented in an "

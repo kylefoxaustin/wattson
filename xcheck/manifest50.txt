@@ -1,0 +1,52 @@
+# wattson 50-app validation population. T = in the 14-app training set.
+# label       command
+alu           ./microbench alu 200000000                                   # T
+mem           ./microbench mem 128 4                                       # T
+chase         ./microbench chase 64 20000000                               # T
+mm            ./microbench mm 256 8                                        # T
+sort          ./microbench sort 1024 4                                     # T
+sgm           ./sgm_ms_ref left736.pgm right736.pgm -n 1                   # T
+bzip2         ./apps/app-bzip2 -9 -c -k ./apps/data.bin                    # T
+lz4           ./apps/app-lz4 -9 -f ./apps/data.bin /dev/null               # T
+lua           ./apps/app-lua ./apps/work.lua                               # T
+sha256        ./apps/app-sha256 ./apps/data.bin 32                         # T
+cjson         ./apps/app-cjson 20000 6                                     # T
+sqlite        ./apps/app-sqlite 40000                                      # T
+pacman        ./apps/app-pacman 6 60                                       # T
+bb-gzip       ./apps/app-busybox gzip -9 -c ./apps/big.bin
+bb-gunzip     ./apps/app-busybox gunzip -c ./apps/data.bin.gz
+bb-sha1       ./apps/app-busybox sha1sum ./apps/big.bin
+bb-md5        ./apps/app-busybox md5sum ./apps/big.bin
+bb-sha512     ./apps/app-busybox sha512sum ./apps/big.bin
+bb-awk        ./apps/app-busybox awk -F, {s+=$3;n++}END{print(s/n)} ./apps/big.txt
+bb-sed        ./apps/app-busybox sed s/status=OK/status=PASS/g ./apps/big.txt
+bb-grep       ./apps/app-busybox grep -cE (gamma|delta),[0-9]{4}, ./apps/big.txt
+bb-sortn      ./apps/app-busybox sort -t, -k3 -n ./apps/big.txt
+bb-cksum      ./apps/app-busybox cksum ./apps/big.bin
+bb-b64        ./apps/app-busybox base64 ./apps/big.bin
+bb-wc         ./apps/app-busybox wc ./apps/big.txt
+cr-md5        ./apps/app-crypto md5 ./apps/data.bin 4
+cr-aes        ./apps/app-crypto aes ./apps/data.bin 2
+cr-blowfish   ./apps/app-crypto blowfish ./apps/data.bin 2
+cr-rc4        ./apps/app-crypto rc4 ./apps/data.bin 3
+cr-b64        ./apps/app-crypto b64 ./apps/data.bin 6
+rd-mandel     ./apps/app-render mandel 20
+rd-plasma     ./apps/app-render plasma 40
+rd-ray        ./apps/app-render ray 25
+rd-life       ./apps/app-render life 60
+heatshrink    ./apps/app-heatshrink ./apps/data.bin 6
+parson        ./apps/app-parson 15000 5
+tommath       ./apps/app-tommath 1024 60
+pcg           ./apps/app-pcg 80000000
+qoi           ./apps/app-qoi 12
+httpp         ./apps/app-httpp 2000
+lz4-fast      ./apps/app-lz4 -1 -f ./apps/big.bin /dev/null
+bzip2-fast    ./apps/app-bzip2 -1 -c -k ./apps/data.bin
+sqlite-heavy  ./apps/app-sqlite 90000
+chase-big     ./microbench chase 128 12000000
+mm-big        ./microbench mm 384 3
+mem-w         ./microbench mem 192 2
+sort-big      ./microbench sort 3072 2
+sgm-a55-1t    env OMP_NUM_THREADS=1 ./apps/app-sgma55 ./apps/syn_left.pgm ./apps/syn_right.pgm -t 1 -n 1
+pacman-big    ./apps/app-pacman 10 50
+sha256-big    ./apps/app-sha256 ./apps/big.bin 6

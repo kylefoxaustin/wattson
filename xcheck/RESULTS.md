@@ -175,3 +175,25 @@ instrumented. Three findings, none fudged:
 Verdict: network CPU-side activity MEASURABLE end-to-end; DMA traffic needs
 accounting outside the cache model (payload bytes are known exactly from the
 transfer itself); cross-machine kernel comparison requires matching NIC paths.
+
+---
+# X4 (same day): stride prefetcher — read band closes to ×/÷1.14
+
+Three rounds, each mechanism-driven:
+- r1 (naive d16, single-stream then 8-stream table, trains on all accesses):
+  mm 0.65→0.97 but bzip2 EXPLODED to 4.27 (loose matching aliases near-random
+  accesses into phantom streams), mem doubled (training on stores fights the
+  write-streaming model), writes wrecked by pollution.
+- r2 (train on LOAD L1-MISSES only, strict +1 advance, ramped depth 2→16):
+  **reads geo 0.98 ×/÷ 1.14 over the 8 above-floor apps** — the roadmap's
+  <×/÷1.15 exit criterion, met. bzip2 0.49→1.26, mm 1.07, chase/mem/cjson/sort
+  0.96–0.98, sgm 0.88, sha256 0.77.
+- r3 (prefetch installs to L3 only, probing L2): reads unchanged (locked);
+  hypothesis "L2 pollution causes lz4's phantom writebacks" FALSIFIED — the
+  writeback inflation under the prefetcher persists (L3 turnover recycles hot
+  dirty lines). Open refinement, named.
+
+**Shipping shape: two-pass extraction** (afgen does this): READS from the
+prefetcher pass (correction ~1.02, band ×/÷1.14); WRITES from the base pass
+(0.90 ×/÷1.09, X1). Each quantity from the configuration that models it best;
+the lz4 prefetch×writeback interaction is the recorded open item.

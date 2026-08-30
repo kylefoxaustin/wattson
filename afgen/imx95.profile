@@ -5,5 +5,6 @@
 # estimate of silicon DRAM transactions.
 GEOM="dcachesize=32768,dassoc=4,dblksize=64,icachesize=32768,iassoc=4,iblksize=64,l2cachesize=65536,l2assoc=4,l2blksize=64,l3=on,l3cachesize=524288,l3assoc=16,l3blksize=64,wstream=on"
 LINE_BYTES=64
-RD_CORRECTION=1.23   # 1/0.81, band x/1.26 (pre-X4; regenerate after X4 lands)
+RD_CORRECTION=1.02   # 1/0.98, band x/1.14 (X4 prefetch pass; finalize on r3)
 WR_CORRECTION=1.11   # 1/0.90, band x/1.09
+PF_ARGS="pfetch=on,pfdegree=16"
