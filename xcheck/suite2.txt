@@ -1,0 +1,2 @@
+sqlite ./apps/app-sqlite 40000
+pacman ./apps/app-pacman 6 60

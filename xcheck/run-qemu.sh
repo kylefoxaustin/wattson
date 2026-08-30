@@ -1,36 +1,48 @@
 #!/usr/bin/env bash
-#
-# xcheck QEMU side: run the microbench under qemu-aarch64 (linux-user) with the
-# TCG activity plugins and emit a wattson activity vector (JSON). This is the
-# *same binary* the board runs under perf (run-perf.sh), so the counts are
-# directly comparable.
-#
-# Env:
-#   QEMU_USER   path to qemu-aarch64 (linux-user; build with
-#               ../configure --target-list=aarch64-linux-user --enable-plugins)
-#   PLUGINS_*   libinsn.so / libcache.so (target-agnostic; reuse the softmmu build's)
-#   LINE        cache line bytes (default 64)
-#
-# Usage: run-qemu.sh <label> -- <microbench args...>
-#   e.g. run-qemu.sh alu-50M -- alu 50000000
-#        run-qemu.sh mem-256x4 -- mem 256 4
+# xcheck QEMU side: run one workload under qemu-aarch64 (linux-user) with the
+# libinsn + libcache TCG plugins, emit a compact activity JSON on stdout.
+# L2 is enabled in the cache model so its misses are the DRAM-transaction proxy.
+# Usage: run-qemu.sh <label> -- <binary> [args...]
 set -eu
-HERE="$(cd "$(dirname "$0")" && pwd)"
-QEMU_USER="${QEMU_USER:-$HOME/Documents/GitHub/95emulator/build-user/qemu-aarch64}"
-PLUGINS_INSN="${PLUGINS_INSN:-$HOME/Documents/GitHub/95emulator/build/tests/tcg/plugins/libinsn.so}"
-PLUGINS_CACHE="${PLUGINS_CACHE:-$HOME/Documents/GitHub/95emulator/build/contrib/plugins/libcache.so}"
+QEMU="${QEMU:-$HOME/Documents/GitHub/95emulator/build-user/qemu-aarch64}"
+PI="${PI:-$HOME/Documents/GitHub/95emulator/build-user/tests/tcg/plugins/libinsn.so}"
+PC="${PC:-$HOME/Documents/GitHub/95emulator/build-user/contrib/plugins/libcache.so}"
 LINE="${LINE:-64}"
-BIN="${MICROBENCH:-$HERE/microbench}"
-
-LABEL="$1"; shift
-[ "${1:-}" = "--" ] && shift
-[ -x "$QEMU_USER" ] || { echo "no qemu-aarch64 at $QEMU_USER (build linux-user target)" >&2; exit 1; }
-[ -x "$BIN" ] || { echo "microbench not built ($BIN); run: aarch64-linux-gnu-gcc -static -O2 -o microbench microbench.c" >&2; exit 1; }
-
+LABEL="$1"; shift; [ "$1" = "--" ] && shift
 LOG="$(mktemp)"; trap 'rm -f "$LOG"' EXIT
-"$QEMU_USER" -plugin "$PLUGINS_INSN" -plugin "$PLUGINS_CACHE" -d plugin \
-    "$BIN" "$@" 2>"$LOG" 1>/dev/null || true
-
-grep -q "total insns:" "$LOG" || { echo "plugins did not flush; qemu-user output:" >&2; tail "$LOG" >&2; exit 2; }
-python3 "$HERE/../harness/parse_activity.py" "$LOG" \
-    --workload "$LABEL" --line "$LINE" --note "qemu-aarch64 linux-user; args: $*"
+# Cache geometry matched to the i.MX95 A55 path (read from the FRDM's sysfs):
+# L1D/L1I 32K 4-way 64B. The plugin's single "l2" models the OUTERMOST level
+# before DRAM -- the DSU's shared 512K 16-way L3 -- so l2_miss = DRAM proxy.
+# M1: full three-level hierarchy matching the FRDM's sysfs, plus the
+# write-streaming model. l3_misses = DRAM READ proxy (same semantics as the
+# silicon's l3d_cache_refill); wstream_dram_writes = DRAM WRITE proxy.
+GEOM="dcachesize=32768,dassoc=4,dblksize=64,icachesize=32768,iassoc=4,iblksize=64"
+GEOM="$GEOM,l2cachesize=65536,l2assoc=4,l2blksize=64"
+GEOM="$GEOM,l3=on,l3cachesize=524288,l3assoc=16,l3blksize=64,wstream=on"
+"$QEMU" -plugin "$PI" -plugin "$PC",l2=on,$GEOM -d plugin "$@" 2>"$LOG" >/dev/null
+python3 - "$LOG" "$LABEL" "$LINE" <<'PY'
+import sys, re, json
+log, label, line = open(sys.argv[1]).read(), sys.argv[2], int(sys.argv[3])
+insns = int(re.search(r"total insns:\s*(\d+)", log).group(1))
+# libcache CSV header then one row per core:
+# core #, data accesses, data misses, dmiss rate, insn accesses, insn misses, imiss rate, l2 accesses, l2 misses, l2 miss rate
+row = None
+for ln in log.splitlines():
+    m = re.match(r"^0\s+(\d+)\s+(\d+)\s+[\d.]+%\s+(\d+)\s+(\d+)\s+[\d.]+%\s+(\d+)\s+(\d+)\s+[\d.]+%\s*$", ln)
+    if m: row = [int(x) for x in m.groups()]; break
+if row is None: sys.exit("libcache row not found")
+d_acc, d_miss, i_acc, i_miss, l2_acc, l2_miss = row
+w = re.search(r"wattson: l3_accesses=(\d+) l3_misses=(\d+) wstream_stores=(\d+) wstream_dram_writes=(\d+)", log)
+l3_acc, l3_miss, ws_st, ws_wr = (int(x) for x in w.groups()) if w else (None, None, None, None)
+print(json.dumps({
+  "schema": "wattson/xcheck-qemu/v1", "workload": label,
+  "provenance": "DERIVED from QEMU TCG plugins (linux-user); NOT silicon",
+  "insns": insns, "l1d_access": d_acc, "l1d_miss": d_miss,
+  "l1i_access": i_acc, "l1i_miss": i_miss,
+  "l2_access": l2_acc, "l2_miss": l2_miss,
+  "l3_access": l3_acc, "l3_miss": l3_miss,
+  "wstream_stores": ws_st, "wstream_dram_writes": ws_wr,
+  "dram_read_proxy": l3_miss, "dram_write_proxy": ws_wr,
+  "dram_transactions_proxy": (l3_miss + ws_wr) if l3_miss is not None else l2_miss,
+  "dram_bytes_proxy": ((l3_miss + ws_wr) * line) if l3_miss is not None else l2_miss * line}, indent=1))
+PY

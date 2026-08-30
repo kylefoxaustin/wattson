@@ -1,0 +1,8 @@
+# third-party trees (extracted from the code-sweep cache or cloned) and built
+# artifacts are NOT committed. pacman-ai (kcy1019/pacman) carries NO LICENSE:
+# we build and run it locally for measurement but never redistribute it.
+# BUILD.md records how to reconstruct everything.
+*/
+app-*
+data.bin
+game1.dat
