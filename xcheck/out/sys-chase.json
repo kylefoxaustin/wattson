@@ -1,0 +1,20 @@
+{
+ "schema": "wattson/xcheck-sys/v1",
+ "app": "chase",
+ "provenance": "DERIVED from QEMU system-mode TCG plugins (guest user+kernel+SM)",
+ "insns_total": 2571805772,
+ "insns_by_cpu": {
+  "0": 238593781,
+  "1": 253618109,
+  "2": 208170643,
+  "3": 88894503,
+  "4": 284791687,
+  "5": 236519505,
+  "6": 1261217544,
+  "7": 0
+ },
+ "l3_miss": 33372836,
+ "wstream_dram_writes": 2041938,
+ "wb_dram_writes": 12026970,
+ "wb_dirty_resident": 3442
+}

@@ -122,3 +122,30 @@ OMP_WAIT_POLICY=passive: i_ratio 1.231 -> **0.985**; DRAM proxies unchanged.
 The entire inflation was barrier spin — timing-dependent instructions, not
 work. Recommendation now carries a measured basis: extract MT activity vectors
 with passive waiting (or subtract spin separately) on barrier-heavy code.
+
+---
+# X2a (same day): system-mode boot-differential — kernel share measured
+
+Harness: the imx95 machine (6xA55 + the real NXP SM on the M33) boots a
+busybox initramfs whose /init selects the app from the kernel cmdline and
+powers off; activity(app) = run(app) − run(null), per-vcpu. NXP boot artifacts
+are operator-supplied (never committed); run-system.sh + the initramfs recipe
+are in-repo.
+
+- **sha256: kernel+system share = 10.0%** over its user-mode instruction count
+  (2.35B work-core differential vs 2.11B linux-user), plus ~10% idle-poll from
+  cpuidle.off=1 (this machine's SCMI-wake workaround pins idle cores in the
+  kernel poll loop — a machine constraint, decomposed per-cpu, not hidden).
+- **Differential noise floor: ±60M insns/cpu boot-to-boot** — chase (370M
+  total) sits below it; apps need ≳0.5B insns for a resolvable differential.
+- **sgm-mt in-guest reads 32%** — spin+poll, not kernel work: the in-guest run
+  lacked OMP_WAIT_POLICY=passive and pinning; X3's proven spin mechanism,
+  reappearing exactly where predicted.
+- Free byproduct: the M33 SM burns 824M insns during a 2.4s boot and ~1.5-3.8B
+  during app runs — the known upstream WFE/WFI idle-spin, measured here as an
+  activity number for the first time (the wfe_halt fix exists out-of-tree).
+
+Verdict movement: kernel share = MEASURABLE (one clean number, method + noise
+floor stated). DMA/network still needs the full-board build (X2b: the minimal
+machine has no NIC). Duty cycle: cpuidle.off=1 makes duty degenerate (idle
+cores never sleep) — proper duty needs the cpuidle path modelled, noted for P1.

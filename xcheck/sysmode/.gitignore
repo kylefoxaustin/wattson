@@ -1,0 +1,4 @@
+Image-imx95evk.bin
+*.dtb
+*.cpio.gz
+ir/
