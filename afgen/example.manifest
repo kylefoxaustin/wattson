@@ -1,0 +1,4 @@
+# label   command (run from this directory)
+sha256    ../xcheck/apps/app-sha256 ../xcheck/apps/data.bin 8
+sort      ../xcheck/microbench sort 256 2
+cjson     ../xcheck/apps/app-cjson 5000 2
