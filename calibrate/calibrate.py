@@ -9,7 +9,7 @@ Fits energy-per-event coefficients so that, per power domain,
 matches the MEASURED per-rail silicon power for a suite of workloads, then reports
 the held-out prediction error. This is the bridge that turns DERIVED activity into
 a power estimate — and its coefficients are what the power team owns for a new chip
-(never reuse i.MX95 coefficients for Zebra; see docs/methodology.md).
+(never reuse i.MX95 coefficients for the next chip; see docs/methodology.md).
 
 Inputs (P1, once the board + BCU are available):
   --activity  dir of wattson activity-vector JSON files (one per workload)

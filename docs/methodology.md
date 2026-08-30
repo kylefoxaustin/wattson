@@ -70,19 +70,19 @@ Per run, per block (see `schema/activity-vector.schema.json`):
 
 Expected block-level accuracy with the cache model included: **≈ ±20%**.
 
-## Extrapolation to an unbuilt chip (P2, "Zebra")
+## Extrapolation to an unbuilt chip (P2)
 
 For a chip that only exists as a QEMU model:
 
-- wattson supplies the **activity** for use-case N on the Zebra QEMU model.
-- The power team supplies **Zebra's** energy-per-event (their pre-silicon model).
+- wattson supplies the **activity** for use-case N on that chip's QEMU model.
+- The power team supplies **the future chip's** energy-per-event (their pre-silicon model).
 - Multiply, for the **QEMU-visible blocks only** (cores, DRAM, modeled
   accelerators). Analog / PLL / PHY / leakage stay entirely on the power-team
   side.
 
 **The rule that keeps this honest:** transfer the *methodology* (how activity is
 extracted), never the i.MX95-fitted *coefficients*. A different node/uarch has
-different joules-per-event; only the power team's Zebra model may supply those.
+different joules-per-event; only the power team's model for that chip may supply those.
 
 ## Known limitations (state these every time)
 

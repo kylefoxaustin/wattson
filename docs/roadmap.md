@@ -21,9 +21,9 @@
 - [ ] Regress activity → measured per-domain power; report held-out error band
       (`calibrate/calibrate.py`).
 
-## P2 — extrapolate to an unbuilt chip ("Zebra")
+## P2 — extrapolate to an unbuilt chip
 - [ ] Run use-cases on the QEMU model of the future chip → activity vectors.
-- [ ] Power team applies **Zebra's** energy-per-event to wattson's activity for the
+- [ ] Power team applies **the future chip's** energy-per-event to wattson's activity for the
       QEMU-visible blocks (cores, DRAM, modeled accelerators).
 - [ ] Deliver a per-use-case, per-block power estimate with an explicit error band
       and an explicit list of what's out of scope (leakage, analog, PLL/PHY).
