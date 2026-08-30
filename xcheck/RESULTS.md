@@ -90,3 +90,35 @@ lines). Silicon side unchanged (banked DDR wr_beats). Full-suite re-run:
 Verdict-slide consequence: "DRAM writes" moves from GAP to USABLE (x1.11
 correction, x/÷1.09). Remaining open: prefetch model (reads), system-mode
 (kernel/DMA/duty), multi-core sweep.
+
+---
+# X3 (same day): the multi-core sweep — correlation survives SMP
+
+Shared-L3 topology fix in the plugin (the DSU's 512K is ONE cache, not one per
+core), deterministic OpenMP workloads (per-N checksums), 1/2/4/6 threads on
+both sides, DDR beats captured per N.
+
+    wl      N   i_ratio  rd_ratio  wr_ratio
+    alu-mt  1-6 0.998-1.000   (compute: exact at every N)
+    mem-mt  1-6 0.967-0.976  0.98 flat  0.75 flat
+    sgm-mt  1,2 0.997/1.009  0.85-0.86  0.84
+    sgm-mt  4,6 1.231/1.182  0.88      0.96-0.98
+
+- **DRAM proxies are thread-count-invariant**: mem's read ratio is 0.98 at
+  every N; sgm's write ratio tightens to 0.96-0.98 under contention. Bus
+  contention does not degrade the model.
+- **Instruction inflation at sgm 4/6T (+18-23%) is OpenMP spin-wait**: barrier
+  spins are timing-dependent instructions, inflated by instrumentation skew.
+  Mitigation measured with OMP_WAIT_POLICY=passive (result appended below).
+- Silicon-side confirmation of the artifact's size: silicon itself only adds
+  1-4% instructions from 1->6T (10.15B -> 10.59B); the delta is QEMU-side spin.
+
+Verdict-slide consequence: multi-core moves from INSUFFICIENT DATA to USABLE
+for DRAM proxies (thread-invariant) and instructions (with passive waiting or
+spin-aware accounting for barrier-heavy code).
+
+**Spin-wait mechanism PROVEN (appended):** sgm-mt 4T re-run with
+OMP_WAIT_POLICY=passive: i_ratio 1.231 -> **0.985**; DRAM proxies unchanged.
+The entire inflation was barrier spin — timing-dependent instructions, not
+work. Recommendation now carries a measured basis: extract MT activity vectors
+with passive waiting (or subtract spin separately) on barrier-heavy code.

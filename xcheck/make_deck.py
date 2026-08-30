@@ -101,12 +101,12 @@ data=[
  ("DRAM-quiet classification",f"{len(QUIET)} low-traffic apps ({', '.join(QUIET)}) predicted quiet; silicon concurs","VALIDATED"),
  ("DRAM write traffic",f"proxy = {GW:.2f} × silicon, ×/÷ {SW:.2f} (X1 writeback model: streaming bursts + dirty evictions)",f"USABLE — apply ×{1/GW:.2f}"),
  ("Kernel & DMA activity","HTTP app: i-ratio 0.80, DRAM invisible — linux-user sees userspace only","GAP — system-mode harness"),
- ("Multi-core","first point only: 4-thread SGM totals within 2% of 1-thread","INSUFFICIENT DATA"),
+ ("Multi-core","13-point sweep (1/2/4/6T × 3 apps): DRAM ratios thread-invariant (mem rd 0.98 at every N); the +23% insn outlier PROVEN to be OpenMP barrier spin (passive wait: 1.231 → 0.985)","USABLE — passive waiting on barrier-heavy code"),
 ]
 def sumcol(ri,c):
     if c==2: return GREEN if "VALIDATED" in data[ri][2] or "USABLE" in data[ri][2] else (AMBER if "GAP" in data[ri][2] else MUTED)
     return None
-table(s,.6,1.55,12.1,(3.1,5.6,3.4),("quantity","result","status"),data,fsz=11,rh=0.52,bold_cols=(0,),color_fn=sumcol)
+table(s,.6,1.55,12.1,(3.1,5.6,3.4),("quantity","result","status"),data,fsz=10.5,rh=0.56,bold_cols=(0,),color_fn=sumcol)
 tb(s,.6,5.15,12.1,.8,"Two instrument findings worth the price of admission: the A55 PMU's l3d_cache_refill counts only DEMAND "
    "refills — prefetched lines bypass it, so ground truth belongs at the DDR controller; and the A55's write-streaming "
    "(no-allocate) mode is a 2.0× error if unmodelled.",11.5,False,INK)
@@ -177,8 +177,9 @@ mech=[
  ("pacman/sqlite/lz4/lua ~0","true traffic below the DDR counter's ~0.4 M-line/window noise floor (calibrated by alu)","classify, don't fit","correctly predicted quiet"),
  ("bzip2 0.49","prefetcher over-fetch on semi-sequential patterns — silicon reads ~2× the demand traffic","prefetch model, or per-class factor","open, named"),
  ("writes 0.02–0.09 (v1)","scattered stores exit DRAM as dirty EVICTIONS, which no allocation-time count can see","X1: dirty-line set + last-level eviction counting","0.90 ×/÷ 1.09"),
+ ("sgm-mt insns 1.23 @4T","OpenMP barrier SPIN — timing-dependent instructions, inflated by instrumentation skew","X3: OMP_WAIT_POLICY=passive (proven, not argued)","0.985; DRAM unmoved"),
 ]
-table(s,.6,1.6,12.1,(2.25,4.9,2.6,2.35),("observation","mechanism","fix","after"),mech,fsz=10.5,rh=0.62,bold_cols=(0,))
+table(s,.6,1.6,12.1,(2.25,4.9,2.6,2.35),("observation","mechanism","fix","after"),mech,fsz=10,rh=0.56,bold_cols=(0,))
 tb(s,.6,5.75,12.1,.8,"The X1 row landed after this deck's first printing and proves the pattern: the named mechanism, implemented in an "
    "afternoon, moved six workloads from near-zero to 0.73–1.03 without touching the read side. Mechanism-first iteration "
    "converges; fudge-factor iteration doesn't.",11.5)
@@ -191,7 +192,8 @@ ver=[
  ("DRAM-quiet screening","use directly","proxy under ~1 M lines reliably means a DRAM-quiet application"),
  ("DRAM write transactions",f"use with ×{1/GW:.2f} correction","×/÷{SW:.2f} band above the write noise floor (X1 writeback model)"),
  ("Network / DMA activity","do not use from linux-user","system-mode harness (exists, boot-differential) required"),
- ("Duty cycle / multi-core","insufficient data","one 4-thread point (within 2%); P1 system-mode work"),
+ ("Multi-core","use for DRAM directly; insns with passive waiting","DRAM ratios thread-invariant 1–6T; spin-wait inflates insns 18–23% on barrier-heavy code otherwise"),
+ ("Duty cycle","not yet measured","rides on the X2 system-mode harness"),
 ]
 def vcol(ri,c):
     if c==1: return GREEN if "use" in ver[ri][1] and "not" not in ver[ri][1] else (AMBER if "only" in ver[ri][1] or "insufficient" in ver[ri][1] else RED)

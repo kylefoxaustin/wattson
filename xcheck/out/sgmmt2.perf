@@ -1,0 +1,5 @@
+# started on Sun Aug 30 14:45:48 2026
+
+10189312856,,instructions,4564586278,100.00,1.24,insn per cycle
+8215704392,,cycles,4564586278,100.00,,
+4697549,,l3d_cache_refill,4564586278,100.00,,

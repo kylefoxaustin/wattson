@@ -19,6 +19,7 @@ LOG="$(mktemp)"; trap 'rm -f "$LOG"' EXIT
 GEOM="dcachesize=32768,dassoc=4,dblksize=64,icachesize=32768,iassoc=4,iblksize=64"
 GEOM="$GEOM,l2cachesize=65536,l2assoc=4,l2blksize=64"
 GEOM="$GEOM,l3=on,l3cachesize=524288,l3assoc=16,l3blksize=64,wstream=on"
+[ -n "${CORES:-}" ] && GEOM="$GEOM,cores=$CORES"
 "$QEMU" -plugin "$PI" -plugin "$PC",l2=on,$GEOM -d plugin "$@" 2>"$LOG" >/dev/null
 python3 - "$LOG" "$LABEL" "$LINE" <<'PY'
 import sys, re, json
