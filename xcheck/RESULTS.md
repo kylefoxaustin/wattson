@@ -72,3 +72,21 @@ Silicon side now also reads the imx9_ddr0 DDR-controller beat counters
 - Multi-core first point: 4-thread SGM totals within 2% of 1-thread on silicon.
 
 Deck: make_deck.py -> xcheck-correlation.pptx (v1, 6 slides, regenerable).
+
+---
+# X1 (same day): the writeback model closes the DRAM-write gap
+
+Dirty-line tracking + last-level eviction counting added to the cache plugin
+(write proxy = streaming bursts + dirty writebacks + still-resident dirty
+lines). Silicon side unchanged (banked DDR wr_beats). Full-suite re-run:
+
+- **Write proxy = 0.90 x silicon, x/÷ 1.09** over the six apps above the write
+  noise floor — TIGHTER than the read side. Per app: cjson 0.08→1.03,
+  bzip2 0.03→0.96, sort 0.82→0.91, chase 0.09→0.90, sgm 0.06→0.85, mem 0.80.
+- Read ratios unchanged (0.81 x/÷1.26) — the model change was surgical.
+- Zero-write apps (sha256, alu) and near-floor rows (lz4/sqlite/pacman)
+  correctly sit at/below the DDR write noise floor (~0.1–0.2M lines/window).
+
+Verdict-slide consequence: "DRAM writes" moves from GAP to USABLE (x1.11
+correction, x/÷1.09). Remaining open: prefetch model (reads), system-mode
+(kernel/DMA/duty), multi-core sweep.

@@ -32,8 +32,8 @@ for ln in log.splitlines():
     if m: row = [int(x) for x in m.groups()]; break
 if row is None: sys.exit("libcache row not found")
 d_acc, d_miss, i_acc, i_miss, l2_acc, l2_miss = row
-w = re.search(r"wattson: l3_accesses=(\d+) l3_misses=(\d+) wstream_stores=(\d+) wstream_dram_writes=(\d+)", log)
-l3_acc, l3_miss, ws_st, ws_wr = (int(x) for x in w.groups()) if w else (None, None, None, None)
+w = re.search(r"wattson: l3_accesses=(\d+) l3_misses=(\d+) wstream_stores=(\d+) wstream_dram_writes=(\d+) wb_dram_writes=(\d+) wb_dirty_resident=(\d+)", log)
+l3_acc, l3_miss, ws_st, ws_wr, wb_wr, wb_res = (int(x) for x in w.groups()) if w else (None,)*6
 print(json.dumps({
   "schema": "wattson/xcheck-qemu/v1", "workload": label,
   "provenance": "DERIVED from QEMU TCG plugins (linux-user); NOT silicon",
@@ -42,7 +42,9 @@ print(json.dumps({
   "l2_access": l2_acc, "l2_miss": l2_miss,
   "l3_access": l3_acc, "l3_miss": l3_miss,
   "wstream_stores": ws_st, "wstream_dram_writes": ws_wr,
-  "dram_read_proxy": l3_miss, "dram_write_proxy": ws_wr,
+  "wb_dram_writes": wb_wr, "wb_dirty_resident": wb_res,
+  "dram_read_proxy": l3_miss,
+  "dram_write_proxy": (ws_wr + wb_wr + wb_res) if ws_wr is not None else ws_wr,
   "dram_transactions_proxy": (l3_miss + ws_wr) if l3_miss is not None else l2_miss,
   "dram_bytes_proxy": ((l3_miss + ws_wr) * line) if l3_miss is not None else l2_miss * line}, indent=1))
 PY

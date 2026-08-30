@@ -28,6 +28,16 @@ for qf in sorted(glob.glob("out/*.qemu.json")):
 FIT_ROWS=[r for r in rows if r["q_rd"] and r["ddr_rd_l"] and r["q_rd"]>=1_000_000 and r["label"] not in ("alu","net")]
 lr=[math.log(r["q_rd"]/r["ddr_rd_l"]) for r in FIT_ROWS]
 GM=math.exp(sum(lr)/len(lr)); SD=math.exp((sum((x-math.log(GM))**2 for x in lr)/len(lr))**0.5)
+lw=[]
+for r0 in rows:
+    try:
+        dd=json.load(open(f"out/{r0['label']}.ddr.json"))
+        q0=json.load(open(f"out/{r0['label']}.qemu.json"))
+        qw=q0.get("dram_write_proxy"); ww=dd["wr_beats_net"]*BEAT//64
+        if qw and ww and qw>=1_000_000 and r0["label"] not in ("alu","net"):
+            lw.append(math.log(qw/ww))
+    except Exception: pass
+GW=math.exp(sum(lw)/len(lw)); SW=math.exp((sum((x-math.log(GW))**2 for x in lw)/len(lw))**0.5)
 QUIET=[r["label"] for r in rows if r["q_rd"] is not None and r["q_rd"]<1_000_000 and r["label"]!="net"]
 N=len(rows)
 
@@ -89,7 +99,7 @@ data=[
  ("Instruction activity, per core","0.98 – 1.06 across all 14 apps (0.997 on a 10.2 B-insn vision app)","VALIDATED — use as-is"),
  ("DRAM read traffic",f"proxy = {GM:.2f} × silicon, geo-spread ×/÷ {SD:.2f} (8 apps above noise floor)",f"USABLE — apply ×{1/GM:.2f}, carry ×/÷{SD:.2f}"),
  ("DRAM-quiet classification",f"{len(QUIET)} low-traffic apps ({', '.join(QUIET)}) predicted quiet; silicon concurs","VALIDATED"),
- ("DRAM write traffic","streaming class modelled (0.80); scattered writes exit via unmodelled dirty evictions","GAP — writeback model next"),
+ ("DRAM write traffic",f"proxy = {GW:.2f} × silicon, ×/÷ {SW:.2f} (X1 writeback model: streaming bursts + dirty evictions)",f"USABLE — apply ×{1/GW:.2f}"),
  ("Kernel & DMA activity","HTTP app: i-ratio 0.80, DRAM invisible — linux-user sees userspace only","GAP — system-mode harness"),
  ("Multi-core","first point only: 4-thread SGM totals within 2% of 1-thread","INSUFFICIENT DATA"),
 ]
@@ -166,11 +176,12 @@ mech=[
  ("sha256 'read 15×'","l3d_cache_refill counts demand only; the prefetcher served the stream invisibly","ground-truth at the DDR controller","0.77 (real gap, real sign)"),
  ("pacman/sqlite/lz4/lua ~0","true traffic below the DDR counter's ~0.4 M-line/window noise floor (calibrated by alu)","classify, don't fit","correctly predicted quiet"),
  ("bzip2 0.49","prefetcher over-fetch on semi-sequential patterns — silicon reads ~2× the demand traffic","prefetch model, or per-class factor","open, named"),
+ ("writes 0.02–0.09 (v1)","scattered stores exit DRAM as dirty EVICTIONS, which no allocation-time count can see","X1: dirty-line set + last-level eviction counting","0.90 ×/÷ 1.09"),
 ]
 table(s,.6,1.6,12.1,(2.25,4.9,2.6,2.35),("observation","mechanism","fix","after"),mech,fsz=10.5,rh=0.62,bold_cols=(0,))
-tb(s,.6,5.75,12.1,.8,"The write side has the same shape one iteration behind: streaming writes land at 0.80, but scattered writes "
-   "reach DRAM via dirty evictions the model does not count yet. The fix (a dirty-bit + writeback counter in the same plugin) "
-   "is mechanical; it was out-scoped from this pass, not discovered missing.",11.5)
+tb(s,.6,5.75,12.1,.8,"The X1 row landed after this deck's first printing and proves the pattern: the named mechanism, implemented in an "
+   "afternoon, moved six workloads from near-zero to 0.73–1.03 without touching the read side. Mechanism-first iteration "
+   "converges; fudge-factor iteration doesn't.",11.5)
 
 # ── 7 · verdict ──────────────────────────────────────────────────────────────
 s=slide("What this licenses, and what it does not","The trust statement, quantity by quantity.")
@@ -178,7 +189,7 @@ ver=[
  ("Per-core instruction activity","use directly","±4% envelope held across every application class tested"),
  ("DRAM read transactions",f"use with ×{1/GM:.2f} correction","carry the ×/÷{:.2f} band; latency/bandwidth-bound apps need almost none".format(SD)),
  ("DRAM-quiet screening","use directly","proxy under ~1 M lines reliably means a DRAM-quiet application"),
- ("DRAM write transactions","streaming class only (0.80)","writeback model required for the general case"),
+ ("DRAM write transactions",f"use with ×{1/GW:.2f} correction","×/÷{SW:.2f} band above the write noise floor (X1 writeback model)"),
  ("Network / DMA activity","do not use from linux-user","system-mode harness (exists, boot-differential) required"),
  ("Duty cycle / multi-core","insufficient data","one 4-thread point (within 2%); P1 system-mode work"),
 ]
@@ -186,9 +197,9 @@ def vcol(ri,c):
     if c==1: return GREEN if "use" in ver[ri][1] and "not" not in ver[ri][1] else (AMBER if "only" in ver[ri][1] or "insufficient" in ver[ri][1] else RED)
     return None
 table(s,.6,1.6,12.1,(3.3,3.0,5.8),("quantity","verdict","condition"),ver,fsz=11,rh=0.52,bold_cols=(0,),color_fn=vcol)
-tb(s,.6,5.35,12.1,.9,"Forward path, in effort order: (1) writeback model — closes the write gap; (2) prefetch model or fitted "
-   "per-class factors — tightens the read band below ×/÷1.26; (3) system-mode boot-differential runs — brings kernel, DMA and "
-   "duty cycle into scope, and enables the P1 power calibration on an instrumented board.",11.5)
+tb(s,.6,5.35,12.1,.9,"Forward path, in effort order: (1) X2 system-mode boot-differential runs — kernel, DMA and duty cycle into scope, "
+   "P1 power calibration enabled; (2) X3 multi-core sweep; (3) X4 prefetch model or fitted per-class factors — tightens the "
+   "read band below ×/÷1.26. (X1, the writeback model, closed the write gap the deck's first printing named.)",11.5)
 tb(s,.6,6.35,12.1,.5,"Reproducibility: wattson/xcheck — one command per side (run-qemu.sh / run-perf.sh / run-ddr.sh), vectors "
    "committed, deck regenerated from the vectors by make_deck.py. The QEMU cache-plugin patch ships in-repo.",10.5,False,MUTED)
 

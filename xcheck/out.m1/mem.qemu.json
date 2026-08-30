@@ -13,10 +13,8 @@
  "l3_miss": 8389569,
  "wstream_stores": 67096720,
  "wstream_dram_writes": 8364076,
- "wb_dram_writes": 1657,
- "wb_dirty_resident": 47,
  "dram_read_proxy": 8389569,
- "dram_write_proxy": 8365780,
+ "dram_write_proxy": 8364076,
  "dram_transactions_proxy": 16753645,
  "dram_bytes_proxy": 1072233280
 }

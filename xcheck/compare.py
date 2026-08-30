@@ -28,6 +28,7 @@ for qf in sorted(glob.glob("out/*.qemu.json")):
 BEAT = 32
 print(f"{'workload':8} {'i_ratio':>8} | {'q_rd_lines':>12} {'ddr_rd_lines':>12} {'RATIO':>7} {'l3_refill':>11} | {'q_wr_lines':>11} {'ddr_wr_lines':>12} {'wr_ratio':>8}")
 lr = []
+lw = []
 for r in rows:
     ir = r["qi"]/r["hi"] if r["hi"] else None
     ddr_rdl = r["ddr_rd"]*BEAT//64 if r["ddr_rd"] else None
@@ -41,6 +42,8 @@ for r in rows:
     # linux-user QEMU (its own finding).
     if rr and r["q_rd"] >= 1_000_000 and r["label"] not in ("alu", "net"):
         lr.append(math.log(rr))
+    if wrr and r["q_wr"] >= 1_000_000 and r["label"] not in ("alu", "net"):
+        lw.append(math.log(wrr))
     print(f"{r['label']:8} {ir:8.3f} | {r['q_rd'] if r['q_rd'] is not None else 0:>12,} "
           f"{ddr_rdl if ddr_rdl else 0:>12,} {f'{rr:7.2f}' if rr else '      -'} "
           f"{r['h_rd'] if r['h_rd'] else 0:>11,} | "
@@ -55,5 +58,10 @@ if lr:
              and r2["label"] != "net"]
     print(f"DRAM-quiet apps, proxy correctly < 1M lines (silicon at/near its "
           f"noise floor): {', '.join(quiet)}")
+if lw:
+    gw = math.exp(sum(lw)/len(lw))
+    sw = math.exp((sum((x-math.log(gw))**2 for x in lw)/len(lw))**0.5)
+    print(f"DRAM-WRITE proxy (wstream + writebacks) vs DDR wr beats, above floor "
+          f"(geo-mean over {len(lw)}): {gw:.2f}  x/÷ {sw:.2f} (geo-sd)")
 json.dump(rows, open("scatter.json","w"), indent=1)
 print("wrote scatter.json")

@@ -1,0 +1,14 @@
+alu    ./microbench alu 200000000
+mem    ./microbench mem 128 4
+chase  ./microbench chase 64 20000000
+mm     ./microbench mm 256 8
+sort   ./microbench sort 1024 4
+sgm    ./sgm_ms_ref left736.pgm right736.pgm -n 1
+bzip2  ./apps/app-bzip2 -9 -c -k ./apps/data.bin
+lz4    ./apps/app-lz4 -9 -f ./apps/data.bin /dev/null
+lua    ./apps/app-lua ./apps/work.lua
+sha256 ./apps/app-sha256 ./apps/data.bin 32
+cjson  ./apps/app-cjson 20000 6
+sqlite ./apps/app-sqlite 40000
+pacman ./apps/app-pacman 6 60
+net    ./apps/app-net http://127.0.0.1:18930/data.bin 8
