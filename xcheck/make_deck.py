@@ -101,7 +101,7 @@ data=[
  ("DRAM-quiet classification",f"{len(QUIET)} low-traffic apps ({', '.join(QUIET)}) predicted quiet; silicon concurs","VALIDATED"),
  ("DRAM write traffic",f"proxy = {GW:.2f} × silicon, ×/÷ {SW:.2f} (X1 writeback model: streaming bursts + dirty evictions)",f"USABLE — apply ×{1/GW:.2f}"),
  ("Kernel activity","boot-differential harness live: sha256 kernel+system share MEASURED at 10.0% over user mode (noise floor ±60M insns/cpu stated)","MEASURABLE — X2a"),
- ("DMA / network activity","HTTP app: i-ratio 0.80, DRAM invisible to linux-user; the minimal system machine has no NIC","GAP — X2b full-board build"),
+ ("DMA / network activity","full-board harness live: CPU-side traffic visible & coherent (read diff ≈ 2× payload); DMA write invisible to TCG by construction (payload bytes known exactly); kernel share device-path-dependent (silicon NIC 17% vs guest virtio 41%)","CHARACTERIZED — model the target's own NIC"),
  ("Multi-core","13-point sweep (1/2/4/6T × 3 apps): DRAM ratios thread-invariant (mem rd 0.98 at every N); the +23% insn outlier PROVEN to be OpenMP barrier spin (passive wait: 1.231 → 0.985)","USABLE — passive waiting on barrier-heavy code"),
 ]
 def sumcol(ri,c):

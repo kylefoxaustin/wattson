@@ -149,3 +149,29 @@ Verdict movement: kernel share = MEASURABLE (one clean number, method + noise
 floor stated). DMA/network still needs the full-board build (X2b: the minimal
 machine has no NIC). Duty cycle: cpuidle.off=1 makes duty degenerate (idle
 cores never sleep) — proper duty needs the cpuidle path modelled, noted for P1.
+
+---
+# X2b (same day): network/DMA on the full board — characterized, boundary named
+
+Full-board build (NIC via virtio-mmio + slirp), plugins ported; the guest
+fetches 33.5 MB from a live host server and hashes it, boot-differentially
+instrumented. Three findings, none fudged:
+
+1. **DMA visibility boundary, confirmed by numbers**: the virtio DMA write
+   into guest RAM bypasses TCG (invisible to the cache model, by construction),
+   but every CPU-side touch is visible and coherent — read-miss differential
+   ≈ 2× payload (DMA buffer → skb → user copies), writeback differential ≈
+   the CPU-written copies.
+2. **Event-loop clients have timing-dependent instruction counts** (mongoose
+   poll: linux-user 0.80 vs boot-diff 1.51 bracket silicon). A blocking-socket
+   client did NOT fully converge the system side (1.66 → 1.42 idle-corrected)
+   — poll-spin partially falsified as the dominant term; recorded.
+3. **Kernel network share is DEVICE-PATH-DEPENDENT**: silicon (real NIC,
+   HW offloads) kernel share = 16.7%; guest virtio+slirp = 41% idle-corrected
+   (~2.4× kernel instructions — software checksum of the payload, different
+   driver, softirq cadence). This is the emulated machine's true activity,
+   not an error: model the TARGET's NIC for the target's numbers.
+
+Verdict: network CPU-side activity MEASURABLE end-to-end; DMA traffic needs
+accounting outside the cache model (payload bytes are known exactly from the
+transfer itself); cross-machine kernel comparison requires matching NIC paths.
