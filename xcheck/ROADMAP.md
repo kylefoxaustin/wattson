@@ -41,3 +41,38 @@ elsewhere; write-streaming (~2x) and missing-middle-L2 mechanisms named.
 
 Cost estimate: M1 ~a session (plugin C work + re-runs), M2 ~a session (builds
 + runs), M3 ~a session. Deck regenerates in seconds at each step.
+
+---
+# Rev 2 roadmap — closing the gaps the deck names (M0–M4 above: DONE 2026-08-30)
+
+Ordered by payoff-per-effort. Each milestone has an exit criterion measured the
+same way the original campaign was: against silicon, with the ratio published
+whichever way it falls.
+
+## X1 — writeback model (the DRAM-write gap)
+Add dirty bits + eviction-writeback counting to the cache plugin (same file as
+the L3/wstream patch). DRAM-write proxy becomes wstream bursts + dirty
+evictions. Exit: write ratios vs imx9_ddr0 wr_beats move from ~0.05 (scattered
+apps) toward the streaming class's 0.80+ across the 14-app suite.
+
+## X2 — system-mode boot-differential harness (kernel, DMA, duty cycle)
+Boot the imx95 machine model (kernel + busybox initramfs exist) with plugins;
+activity(app) = run(app-as-init) − run(null-init). Brings kernel instruction
+share (net's missing 20%), DMA-adjacent traffic, and WFI-residency duty cycle
+(schema field active_fraction_by_cpu) into scope. Exit: net's i-ratio computed
+against full user+kernel counts lands 0.95–1.05.
+
+## X3 — multi-core sweep
+Suite at 1/2/4/6 threads: plugin cores=N per-core caches vs pinned silicon
+core-sets, DDR PMU alongside. Exit: per-thread-count correlation table; the
+single 4-thread point (within 2%) becomes a curve.
+
+## X4 — prefetch model (tighten the read band)
+Next-line/stride prefetcher in the plugin, iterated against DDR ground truth;
+per-class fitted factors as the fallback if a simple model won't converge.
+Exit: bzip2/mm/sqlite move toward 1.0 and the population geo-sd drops below
+x/1.15.
+
+## P1 — power calibration (hardware-blocked)
+Unchanged: needs the IMX95LPD5EVK-19 (BCU rails, AN14449 procedure). X1–X4
+sharpen the activity vectors P1 will regress against measured rail power.
