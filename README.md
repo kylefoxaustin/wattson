@@ -106,6 +106,36 @@ Rates need a duration only the power team can supply; the JSON says so
 explicitly. Per-target calibration (cache geometry + correction factors)
 lives in a `.profile` — a new SoC means one xcheck campaign, not a new tool.
 
+### Feeding a gate-activity power model
+
+Most power spreadsheets ask for an **activity factor** per IP block as a
+percentage — the fraction of gates toggling per clock, typically assumed at
+3%, with ~5% meaning the block is maxed out. That is a *gate* quantity;
+wattson measures *utilization*. The bridge needs no gate counts, because the
+5% anchor already contains the gates-per-event constant:
+
+```
+AF_app  =  AF_idle + (AF_max − AF_idle) × U      U = app activity ÷ the same block saturated
+```
+
+Both terms of `U` come from QEMU, and the saturating references ship with the
+repo (`microbench alu` saturates the pipeline, `microbench mem` the memory
+system). The spreadsheet, its coefficients, and its physics are unchanged —
+one assumed constant is replaced by a measured one. Validate the linearity
+once, with two rail measurements: idle and saturated.
+
+**The point of doing it this way**: today you assume 3% and get the power of
+an abstraction. This way you name an application and get the power of *that
+application*.
+
+Three levels of detail are available, all from stock upstream plugins:
+aggregate **counts per run** (one AF per block, the level validated here), an
+**instruction-class histogram** (`howvec` — integer / load-store / branch /
+FP-SIMD, so a per-class AF can distinguish workloads that a single AF cannot:
+SQLite is 52% load/store where Pac-Man is 37% integer ALU with 13× the FP/SIMD
+share), and a **full instruction trace** (`execlog` — every instruction in
+order, turning the AF into a time series).
+
 ## The phases
 
 | Phase | Who supplies activity | Who supplies energy | Output |

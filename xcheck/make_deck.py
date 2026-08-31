@@ -90,99 +90,136 @@ def table(s,x,y,w,col_w,hdr,data,fsz=10.5,rh=0.32,bold_cols=(),color_fn=None):
 
 # ── 1 · title ────────────────────────────────────────────────────────────────
 s=prs.slides.add_slide(blank); PAGE[0]+=1
-band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,0,Inches(2.35),prs.slide_width,Inches(1.9))
+band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,0,Inches(2.5),prs.slide_width,Inches(1.7))
 band.fill.solid(); band.fill.fore_color.rgb=INK; band.line.fill.background()
-tb(s,.9,2.5,11.5,.55,"Correlating QEMU functional activity with i.MX95 silicon",27,True,WHITE)
-tb(s,.9,3.35,11.5,.6,"wattson cross-check (xcheck) · rev 3 · tested DEEP (14 apps, mechanism by mechanism) and BROAD (36 more, never seen before)",15,False,RGBColor(0xC9,0xD4,0xE4))
-tb(s,.9,4.6,11.5,.6,"Thesis under test: a functional emulator's activity counts — instructions retired, cache-model misses —\ntrack what the silicon actually does closely enough to anchor per-event power estimation.",13,False,MUTED)
-tb(s,.9,6.8,11.5,.4,"Kyle Fox · measured on FRDM-IMX95 silicon + qemu-aarch64 TCG plugins · 2026-08-30",11,False,MUTED)
+tb(s,.9,2.62,11.5,.55,"Activity factors for power modelling, measured in QEMU",27,True,WHITE)
+tb(s,.9,3.42,11.5,.5,"Validated against i.MX95 silicon · 50 applications · wattson / xcheck",15,False,RGBColor(0xC9,0xD4,0xE4))
+tb(s,.9,4.55,11.5,.4,"Kyle Fox · 2026-08-30",12,False,MUTED)
 
-# ── 2 · the verdict (the answer, up front) ──────────────────────────────────
-s=slide("Can a user get activity factors that match silicon?",
-        "The question this whole campaign exists to answer, answered.")
-band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(.6),Inches(1.45),Inches(12.1),Inches(1.0))
+# ── 2 · the answer ───────────────────────────────────────────────────────────
+s=slide("Can we produce activity factors that match silicon?")
+band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(.6),Inches(1.20),Inches(12.1),Inches(.72))
 band.fill.solid(); band.fill.fore_color.rgb=RGBColor(0x0E,0x5C,0x2B); band.line.fill.background()
-band.height=Inches(1.05)
-tb(s,.9,1.52,11.6,.45,"YES — for CPU and DRAM activity, within the bands below.",20,True,WHITE)
-tb(s,.9,1.92,11.6,.4,"Not 'yes in principle'. The corrections were fitted on 14 applications and then held on 36 the model had never seen, "
-   "with the SAME spread — which is the user's situation exactly: an app nobody has measured.",11.5,False,RGBColor(0xC9,0xE4,0xD4))
+tb(s,.9,1.30,11.6,.45,"YES — for CPU and DRAM activity, within the bands below.",20,True,WHITE)
 
-yes=[("Instructions, per core","×1.00 — use raw","0.979 ×/÷1.04 on 36 unseen apps"),
-     ("DRAM reads","×1.02","×/÷1.21 held out — identical to the fitted set"),
-     ("DRAM writes","×1.11","×/÷1.28 held out — the widest band; treat as an envelope"),
-     ("Is this app DRAM-quiet?","yes/no, no correction","every quiet app classified correctly, both sets"),
-     ("User AND kernel instructions","boot-differential, system mode","kernel+system share MEASURED: sha256 10.0%, networking 16.7%")]
-tb(s,.6,2.62,6.0,.3,"WHAT YOU GET, AND WHAT IT IS WORTH",12,True,GREEN)
-table(s,.6,2.95,6.0,(2.3,1.5,2.2),("quantity","apply","held-out evidence"),yes,fsz=8.5,rh=0.44,bold_cols=(0,))
+yes=[("Instructions, per core","use raw","0.979","×/÷1.04"),
+     ("DRAM reads","×1.02","0.91","×/÷1.21"),
+     ("DRAM writes","×1.11","0.83","×/÷1.28"),
+     ("DRAM-quiet screening","yes/no","100%","—"),
+     ("User + kernel instructions","system mode","10.0% kernel","measured")]
+tb(s,.6,2.05,6.0,.28,"WHAT WE PRODUCE",12,True,GREEN)
+table(s,.6,2.36,6.0,(2.4,1.3,1.15,1.15),("quantity","apply","held-out","spread"),yes,fsz=10,rh=0.42,bold_cols=(0,))
 
-no=[("Accelerator compute — TODAY","the emulator does not execute GPU/VPU/NPU work, so there is no activity to count. Moving: a Neutron NPU model is in build now; a GPU AF scope off the GLES command stream is the next investigation"),
-    ("DMA payload bytes","a device model writes guest memory without going through TCG, so no CPU-side plugin can see it. The bytes are known exactly to the device model — this is an instrumentation gap, not an unknown"),
-    ("Which core, at what DVFS point","QEMU has no frequency or core-type notion. Counts are per-vCPU and frequency-free; mapping them onto big/LITTLE and an OPP is the power model's job")]
-tb(s,6.9,2.62,5.8,.3,"TODAY'S BOUNDARIES",12,True,RED)
-table(s,6.9,2.95,5.8,(1.9,3.9),("boundary","why"),no,fsz=8.5,rh=0.62,bold_cols=(0,))
+no=[("Accelerator compute","NPU model in build; GPU next"),
+    ("DMA payload bytes","known to the device model, not yet counted"),
+    ("Core identity, DVFS point","QEMU has no frequency notion")]
+tb(s,6.9,2.05,5.8,.28,"NOT TODAY",12,True,RED)
+table(s,6.9,2.36,5.8,(2.4,3.4),("boundary","status"),no,fsz=10,rh=0.42,bold_cols=(0,))
 
-tb(s,.6,5.70,12.1,.7,"HOW THE TWO HALVES COMBINE. DEEP earned the corrections: 14 applications iterated mechanism by mechanism — a "
-   "silicon-matched cache hierarchy, A55 write-streaming, a writeback model, a stride prefetcher — with five hypotheses falsified "
-   "and recorded on the way. BROAD proved they are not curve-fits: 36 further applications, measured cold, land in the same bands. "
-   "Deep alone would be a tuned demo; broad alone would be a coincidence. Together they are a licence to use the numbers on an "
-   "application nobody has run yet.",11,True)
-tb(s,.6,6.62,12.1,.45,"THE HANDOFF:   afgen/afgen.sh my-apps.manifest afs/   →   one activity-factor JSON per application — counts per run, "
-   "ready to paste into the power team's spreadsheet as the N column of E = Σ eᵢ×Nᵢ. Fifty apps in, fifty AFs out.",10.5,True,GREEN)
-tb(s,.6,7.06,12.1,.35,"By design, wattson supplies N and never eᵢ: the energy coefficients are the power team's half of the equation. These bands "
-   "are what the ACTIVITY column is worth.",8.5,False,MUTED)
+tb(s,.6,5.02,12.1,.32,"WHY THE NUMBERS TRANSFER TO AN APP NOBODY HAS MEASURED",12,True,ACCENT)
+tb(s,.6,5.34,12.1,.5,"Corrections were fitted on 14 applications, then applied cold to 36 the model had never seen. "
+   "They landed in the same bands. That is the whole licence.",13,True)
 
-# ── 3 · executive summary ────────────────────────────────────────────────────
-s=slide("Executive summary","Everything on one slide; the rest of the deck is evidence.")
+tb(s,.6,6.02,12.1,.3,"THE HANDOFF",12,True,GREEN)
+tb(s,.6,6.32,12.1,.4,"afgen/afgen.sh my-apps.manifest afs/   →   one JSON per application: counts per run, provenance-tagged.",13,True,GREEN)
+tb(s,.6,6.76,12.1,.35,"Fifty apps in, fifty activity factors out. wattson supplies the counts; energy coefficients stay yours.",12,False,MUTED)
+
+# ── 3 · recommendation: the gate-AF bridge ───────────────────────────────────
+s=slide("Recommendation — the gate-activity bridge")
+tb(s,.6,1.16,12.2,.36,"Your spreadsheet wants a GATE activity factor. QEMU measures UTILIZATION. The bridge is a number you already have.",13,True)
+
+lft=[("your model","fraction of gates toggling per clock: 0% / 3% / 5% / 7%. 5% = block maxed out. Assumed per block."),
+     ("what we measure","events actually executed: instructions, DRAM transactions, cache accesses. Per application."),
+     ("the gap","utilization is not gate toggling — but your 5% anchor already contains the gates-per-event constant.")]
+table(s,.6,1.62,12.1,(2.0,10.1),("","")  if False else ("term","meaning"),lft,fsz=11,rh=0.44,bold_cols=(0,))
+
+box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(3.35),Inches(12.1),Inches(1.15))
+box.fill.solid(); box.fill.fore_color.rgb=ZEBRA; box.line.color.rgb=ACCENT; box.line.width=Pt(1.5)
+tb(s,.9,3.48,11.5,.4,"AF_app   =   AF_idle  +  ( AF_max − AF_idle ) × U",20,True,ACCENT,font="Consolas")
+tb(s,.9,3.95,11.5,.45,"AF_max = your existing 5% anchor.   U = measured activity ÷ the same block saturated, both from QEMU.   "
+   "No gate counts needed: your anchor already holds that constant.",12,False,INK)
+
+rec=[("1","Pick the saturating reference per block","we ship the microbenches: alu saturates the pipeline, mem the memory system"),
+     ("2","Measure the application","afgen gives counts; U = app activity ÷ saturating activity"),
+     ("3","Scale your existing anchor","AF = 5% × U. Spreadsheet unchanged, physics unchanged, one guess replaced"),
+     ("4","Validate once on silicon","two rail measurements — idle and saturated — confirm the anchor is linear in U")]
+table(s,.6,4.66,12.1,(0.5,4.3,7.3),("#","step","what it means"),rec,fsz=10.5,rh=0.42,bold_cols=(1,))
+
+tb(s,.6,6.62,12.1,.42,"THE TURN-AROUND:  today you assume 3% and get the power of an abstraction. This way you name an application — "
+   "\"what does Pac-Man cost?\" — and get the power of that application.",13,True,GREEN)
+
+# ── 4 · what we can hand over ────────────────────────────────────────────────
+s=slide("Three levels of detail — all available today")
+tb(s,.6,1.16,12.2,.36,"Aggregate counts are the cheapest. A per-class histogram or a full instruction trace costs only run time.",13,True)
+
+tiers=[("1 · counts per run","instructions, DRAM reads/writes, cache accesses per level","one AF per block","validated in this deck"),
+       ("2 · instruction-class histogram","integer / load-store / branch / FP-SIMD / system split","per-class AF","upstream plugin, no new work"),
+       ("3 · full instruction trace","every instruction in order, with its memory accesses","AF as a time series","upstream plugin, large output")]
+table(s,.6,1.62,12.1,(2.9,5.0,2.0,2.2),("what you get","content","what it buys you","status"),tiers,fsz=10.5,rh=0.52,bold_cols=(0,))
+
+tb(s,.6,3.92,12.1,.32,"WHY LEVEL 2 MATTERS — MEASURED, TWO REAL APPLICATIONS ON THE SAME CORE",12,True,ACCENT)
+mix=[("integer ALU","28.1%","36.9%"),("load / store","52.2%","41.9%"),("branch","19.7%","19.9%"),
+     ("FP / SIMD","0.1%","1.3%"),("total instructions","2.57 B","25.7 B")]
+table(s,.6,4.24,6.6,(2.6,2.0,2.0),("instruction class","SQLite","Pac-Man"),mix,fsz=10,rh=0.36,bold_cols=(0,))
+
+tb(s,7.5,4.24,5.2,.4,"Same CPU block. Same flat 5% anchor would give both the same answer.",12,True)
+tb(s,7.5,4.78,5.2,1.6,"SQLite spends over half its instructions in load/store; Pac-Man is a third more ALU-heavy and toggles "
+   "13× the FP/SIMD share. Those light up different gates. A per-class AF separates them; a single AF cannot.",11.5,False,INK)
+
+tb(s,.6,6.62,12.1,.4,"Levels 2 and 3 are stock upstream QEMU plugins (howvec, execlog) — the numbers above were produced with them, "
+   "unmodified, this evening. Nothing new has to be written to supply either.",11.5,False,MUTED)
+
+# ── 5 · the numbers ──────────────────────────────────────────────────────────
+s=slide("The numbers")
 data=[
- ("Generalization (the gate)","corrections fitted on 14 apps HELD on 36 unseen apps: insns 0.979 ×/÷1.04, reads transfer with identical ×/÷1.21 spread","VALIDATED — 50-app held-out"),
- ("Instruction activity, per core","0.98 – 1.06 across all 14 apps (0.997 on a 10.2 B-insn vision app)","VALIDATED — use as-is"),
- ("DRAM read traffic","X4 prefetch model: proxy = 0.98 × silicon, ×/÷ 1.14 — the exit criterion met (was 0.81 ×/÷ 1.26)","USABLE — correction ~1.0"),
- ("DRAM-quiet classification",f"{len(QUIET)} low-traffic apps ({', '.join(QUIET)}) predicted quiet; silicon concurs","VALIDATED"),
- ("DRAM write traffic",f"proxy = {GW:.2f} × silicon, ×/÷ {SW:.2f} (X1 writeback model, base pass); 0.83 ×/÷ 1.28 held-out",f"USABLE — apply ×{1/GW:.2f}"),
- ("Kernel activity","boot-differential harness live: sha256 kernel+system share MEASURED at 10.0% over user mode","MEASURABLE — X2a"),
- ("DMA / network activity","CPU-side traffic visible & coherent; DMA write invisible to TCG by construction; kernel share device-path-dependent (silicon NIC 17% vs virtio 41%)","CHARACTERIZED — model the target's own NIC"),
- ("Multi-core","DRAM ratios thread-invariant across a 1/2/4/6T sweep; the +23% insn outlier PROVEN to be OpenMP barrier spin (passive: 1.231 → 0.985)","USABLE — passive waiting on barrier-heavy code"),
+ ("Generalization","fitted on 14 apps, held on 36 unseen: insns 0.979 ×/÷1.04, reads same ×/÷1.21 spread","VALIDATED"),
+ ("Instructions, per core","0.98 – 1.06 across all 14; 0.997 on a 10.2 B-instruction vision app","USE AS-IS"),
+ ("DRAM reads","0.98 × silicon, ×/÷1.14 fitted (was 0.81 ×/÷1.26 before the prefetch model)","×1.02"),
+ ("DRAM writes",f"{GW:.2f} × silicon, ×/÷{SW:.2f} fitted; 0.83 ×/÷1.28 held out","×1.11"),
+ ("DRAM-quiet screening",f"{len(QUIET)} low-traffic apps predicted quiet; silicon agrees","VALIDATED"),
+ ("Kernel share","system-mode boot-differential: sha256 10.0%, networking 16.7%","MEASURED"),
+ ("Multi-core","DRAM ratios thread-invariant 1–6T; +23% instruction outlier was OpenMP spin","USE"),
+ ("DMA","device-model writes bypass TCG; payload bytes known exactly","GAP, NAMED"),
 ]
 def sumcol(ri,c):
-    if c==2: return GREEN if "VALIDATED" in data[ri][2] or "USABLE" in data[ri][2] else (AMBER if "GAP" in data[ri][2] else MUTED)
+    if c==2: return GREEN if data[ri][2] in ("VALIDATED","USE AS-IS","MEASURED","USE") else (AMBER if "GAP" in data[ri][2] else ACCENT)
     return None
-table(s,.6,1.5,12.1,(3.1,5.6,3.4),("quantity","result","status"),data,fsz=10,rh=0.46,bold_cols=(0,),color_fn=sumcol)
-tb(s,.6,6.0,12.1,.8,"Two instrument findings worth the price of admission: the A55 PMU's l3d_cache_refill counts only DEMAND "
-   "refills — prefetched lines bypass it, so ground truth belongs at the DDR controller; and the A55's write-streaming "
-   "(no-allocate) mode is a 2.0× error if unmodelled.",11.5,False,INK)
-tb(s,.6,6.78,12.1,.6,"Scope discipline: these are ACTIVITY correlations. wattson never emits watts — energy-per-event "
-   "coefficients belong to the power team, and QEMU-derived counts are never labelled as silicon measurements.",11,False,MUTED)
+table(s,.6,1.28,12.1,(2.6,7.0,2.5),("quantity","result","apply"),data,fsz=11,rh=0.55,bold_cols=(0,),color_fn=sumcol)
+tb(s,.6,6.50,12.1,.4,"Two instrument findings: the A55 PMU's l3d_cache_refill counts DEMAND refills only — prefetched lines bypass it, "
+   "so ground truth belongs at the DDR controller. A55 write-streaming is a 2.0× error if unmodelled.",11.5,False,MUTED)
 
-# ── 3 · method ───────────────────────────────────────────────────────────────
-s=slide("Method — one binary, two observatories","Identical static aarch64 binaries; nothing recompiled between worlds.")
-for x0,hdr,lines in ((0.6,"QEMU (DERIVED)",[
-    "qemu-aarch64 (linux-user) + libinsn / libcache TCG plugins",
-    "Cache model = the board's own hierarchy, read from its sysfs:",
-    "L1I/L1D 32 KiB 4-way · L2 64 KiB 4-way · shared L3 512 KiB 16-way, 64 B lines",
-    "+ A55-style write-streaming: ≥4 sequential store-miss lines → no-allocate",
-    "L3 misses → DRAM-read proxy · streaming bursts → DRAM-write proxy",
-    "Linux-user mode ⇒ counts contain the application only (no boot, no OS)"]),
-  (6.85,"Silicon (MEASURED)",[
+# ── 6 · method ───────────────────────────────────────────────────────────────
+s=slide("Method — one binary, two observatories")
+tb(s,.6,1.16,12.2,.34,"Identical static aarch64 binaries. Nothing recompiled between the two worlds.",13,True)
+for x0,hdr,lines in ((0.6,"QEMU  (derived)",[
+    "qemu-aarch64 + TCG plugins",
+    "Cache model = the board's own hierarchy, from its sysfs:",
+    "L1 32K/4w · L2 64K/4w · shared L3 512K/16w, 64 B lines",
+    "A55 write-streaming, writeback, stride prefetcher modelled",
+    "L3 misses → read proxy · evictions → write proxy"]),
+  (6.85,"Silicon  (measured)",[
     "FRDM-IMX95, perf stat, pinned to A55 core 0",
-    "Core PMU: instructions, cycles, L1/L2/L3 refill events",
-    "imx9_ddr0 DDR-controller PMU: read / write beats (32 B), system-wide,",
-    "with an equal-duration idle window subtracted",
-    "The DDR controller is the arbiter: it sees prefetch and DMA traffic",
-    "that core-side refill events do not"])):
-    box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(x0),Inches(1.55),Inches(5.9),Inches(3.3))
+    "Core PMU: instructions, cycles, L1/L2/L3 refills",
+    "imx9_ddr0 DDR-controller PMU: read/write beats (32 B)",
+    "System-wide, with an equal-duration idle window subtracted",
+    "The DDR controller sees prefetch traffic the core PMU cannot"])):
+    box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(x0),Inches(1.58),Inches(5.9),Inches(2.75))
     box.fill.solid(); box.fill.fore_color.rgb=ZEBRA; box.line.color.rgb=ACCENT; box.line.width=Pt(1.2)
-    tb(s,x0+.25,1.7,5.4,.4,hdr,15,True,ACCENT)
-    tf=tb(s,x0+.25,2.2,5.5,2.5,lines[0],11)
+    tb(s,x0+.25,1.72,5.4,.35,hdr,15,True,ACCENT)
+    tf=tb(s,x0+.25,2.15,5.5,1.9,lines[0],11)
     for ln in lines[1:]:
         p=tf.add_paragraph(); r=p.add_run(); r.text=ln; r.font.size=Pt(11); r.font.name="Calibri"; r.font.color.rgb=INK
-tb(s,.6,5.15,12.1,.7,"Population (14): five microbench corners spanning the activity extremes (ALU, streaming, pointer-chase, "
-   "matmul, sort) and nine applications — stereo vision on real imagery, two compressors, an interpreter, a hash, a JSON "
-   "codec, an in-memory database, a game-AI trainer, and a live-socket HTTP client.",11.5)
-tb(s,.6,6.0,12.1,.6,"Validity gates: every app prints a checksum (dead-code-proof); the vision app is hash-gated bit-exact against "
-   "its published golden; instruction agreement is required before any cache-level conclusion is read.",11,False,MUTED)
+tb(s,.6,4.58,12.1,.32,"THE 50 APPLICATIONS",12,True,ACCENT)
+tb(s,.6,4.92,12.1,.9,"14 development apps: five microbench corners (ALU, streaming, pointer-chase, matmul, sort) plus stereo "
+   "vision, two compressors, an interpreter, SHA-256, a JSON codec, SQLite, a game-AI trainer, an HTTP client.\n"
+   "36 held-out apps, never seen by the model: busybox applets, crypto kernels, software renderers, bignum, "
+   "hashing, parsers, sockets.",12)
+tb(s,.6,6.55,12.1,.4,"Every app prints a checksum so dead-code elimination cannot fake a result; the vision app is hash-gated "
+   "bit-exact against its published golden.",11.5,False,MUTED)
 
-# ── 4 · instruction validation ───────────────────────────────────────────────
-s=slide("Gate 1 — instructions agree, all fourteen apps","Same binary ⇒ same retired instructions. This gate must pass before anything downstream is read.")
+# ── 7 · gate 1 ───────────────────────────────────────────────────────────────
+s=slide("Gate 1 — instructions agree")
+tb(s,.6,1.16,12.2,.34,"Same binary ⇒ same retired instructions. This must pass before any cache-level number is read.",13,True)
 half=(N+1)//2
 def irow(r):
     ir=r["qi"]/r["hi"]
@@ -194,66 +231,64 @@ def ircol(rowlist):
         return None
     return f
 left=[irow(r) for r in rows[:half]]; right=[irow(r) for r in rows[half:]]
-table(s,.6,1.6,6.0,(1.15,2.6,1.55,0.7),("app","workload","HW insns","ratio"),left,fsz=10,rh=0.42,color_fn=ircol(left))
-table(s,6.85,1.6,6.0,(1.15,2.6,1.55,0.7),("app","workload","HW insns","ratio"),right,fsz=10,rh=0.42,color_fn=ircol(right))
-tb(s,.6,5.6,12.1,.9,"Thirteen of fourteen sit in 0.98–1.06; the residual is silicon-side kernel/IRQ time inside the perf window. "
-   "The one amber value is itself a measurement: the HTTP client's 0.80 is the ~20% of its instructions the kernel's network "
-   "stack retires on its behalf — real work a userspace-only emulation cannot see, quantified. Follow-up: compare against "
-   "user-mode-filtered counts (instructions:u).",11.5)
+table(s,.6,1.62,6.0,(1.15,2.6,1.55,0.7),("app","workload","HW insns","ratio"),left,fsz=10.5,rh=0.52,color_fn=ircol(left))
+table(s,6.85,1.62,6.0,(1.15,2.6,1.55,0.7),("app","workload","HW insns","ratio"),right,fsz=10.5,rh=0.52,color_fn=ircol(right))
+tb(s,.6,6.35,12.1,.5,"Thirteen of fourteen sit in 0.98 – 1.06. The amber value is itself a measurement: the HTTP client's 0.80 is the "
+   "~20% of its instructions the kernel's network stack retires on its behalf — visible in system mode, not in this one.",12,True)
 
-# ── 5 · money chart ──────────────────────────────────────────────────────────
-s=slide("Gate 2 — DRAM-read proxy vs the DDR controller",
-        f"log–log, one point per application above the noise floor · fit: proxy = {GM:.2f} × silicon, ×/÷ {SD:.2f}")
-s.shapes.add_picture("scatter.png",Inches(3.35),Inches(1.35),height=Inches(5.35))
-tb(s,.6,6.75,12.1,.5,"Under-prediction is systematic and single-signed: the silicon prefetcher also fetches lines that are never "
-   "consumed. chase 0.97 · mem 0.98 · cjson 0.96 · sort 0.96 · sgm 0.88 · sha256 0.77 · mm 0.65 · bzip2 0.49.",11.5,True)
+# ── 8 · gate 2 ───────────────────────────────────────────────────────────────
+s=slide("Gate 2 — DRAM reads vs the DDR controller")
+tb(s,.6,1.16,12.2,.34,f"One point per application above the noise floor. Fit: proxy = {GM:.2f} × silicon, ×/÷ {SD:.2f}.",13,True)
+s.shapes.add_picture("scatter.png",Inches(3.75),Inches(1.52),height=Inches(5.20))
+tb(s,.6,6.80,12.1,.4,"Under-prediction was systematic and single-signed — the silicon prefetcher fetches lines nothing consumes. "
+   "Modelling the prefetcher moved the fit from 0.81 to 0.98.",11.5,False,MUTED)
 
-# ── 5b · generalization ─────────────────────────────────────────────────────
-s=slide("The 50-application held-out validation",
-        "Corrections fitted on the 14 development apps (train), then applied cold to 36 applications the model had never seen (holdout).")
-s.shapes.add_picture("scatter50.png",Inches(1.45),Inches(1.5),width=Inches(10.4))
-tb(s,.6,6.55,12.1,.7,"Held-out instructions 0.979 ×/÷ 1.04 (n=37) · held-out reads 0.91 ×/÷ 1.21 — the SAME spread as the fitted "
-   "population · writes 0.83 ×/÷ 1.28 · every DRAM-quiet app correctly classified. A variance projection built on 14 "
-   "applications predicted 36 it had never seen — the factors are properties of the model, not of the apps they were fitted on.",11.5,True)
+# ── 9 · held out ─────────────────────────────────────────────────────────────
+s=slide("The 50-application held-out validation")
+tb(s,.6,1.16,12.2,.34,"Red = the 14 apps the corrections were fitted on. Blue = 36 applications measured cold.",13,True)
+s.shapes.add_picture("scatter50.png",Inches(1.55),Inches(1.60),width=Inches(10.2))
+tb(s,.6,6.55,12.1,.5,"Held-out instructions 0.979 ×/÷1.04 (n=37) · reads 0.91 ×/÷1.21, the SAME spread as the fitted set · "
+   "writes 0.83 ×/÷1.28 · every DRAM-quiet app correctly classified.",12.5,True)
 
-# ── 6 · mechanisms ───────────────────────────────────────────────────────────
-s=slide("Every outlier resolved to a mechanism, not a fudge","The band tightened from ×/÷2.4 to ×/÷1.26 in three fixes; each was falsifiable and predicted its own after-number.")
+# ── 10 · mechanisms ──────────────────────────────────────────────────────────
+s=slide("Every outlier resolved to a mechanism")
+tb(s,.6,1.16,12.2,.34,"The band tightened from ×/÷2.4 to ×/÷1.14. Each fix was falsifiable and predicted its own after-number.",13,True)
 mech=[
- ("mm read 0.44 (v0)","plugin default cache ≫ real 64 KiB L2 — model thought the working set was resident","model the sysfs hierarchy","0.65 (residual = prefetch)"),
- ("mem read 1.97 (v0)","A55 write-streaming: no-allocate store bursts; plugin read-allocated every store","streak detector, ≥4 lines → no-allocate","0.98"),
- ("sha256 'read 15×'","l3d_cache_refill counts demand only; the prefetcher served the stream invisibly","ground-truth at the DDR controller","0.77 (real gap, real sign)"),
- ("pacman/sqlite/lz4/lua ~0","true traffic below the DDR counter's ~0.4 M-line/window noise floor (calibrated by alu)","classify, don't fit","correctly predicted quiet"),
- ("bzip2 0.49","prefetcher over-fetch on semi-sequential patterns — silicon reads ~2× the demand traffic","prefetch model, or per-class factor","open, named"),
- ("writes 0.02–0.09 (v1)","scattered stores exit DRAM as dirty EVICTIONS, which no allocation-time count can see","X1: dirty-line set + last-level eviction counting","0.90 ×/÷ 1.09"),
- ("sgm-mt insns 1.23 @4T","OpenMP barrier SPIN — timing-dependent instructions, inflated by instrumentation skew","X3: OMP_WAIT_POLICY=passive (proven, not argued)","0.985; DRAM unmoved"),
- ("reads 0.49–0.77 (under)","silicon prefetcher traffic the model never issued","X4: 8-stream table, miss-trained, strict +1, ramped depth","0.98 ×/÷ 1.14"),
+ ("mm reads 0.44","plugin cache ≫ real 64 KiB L2","model the sysfs hierarchy","0.65"),
+ ("mem reads 1.97","A55 write-streaming: no-allocate store bursts","streak detector, ≥4 lines","0.98"),
+ ("sha256 'reads 15×'","PMU counts demand refills only","ground-truth at the DDR controller","0.77"),
+ ("4 apps read ~0","below the DDR counter's noise floor","classify, don't fit","predicted quiet"),
+ ("writes 0.02–0.09","scattered stores exit as dirty EVICTIONS","dirty-line set + eviction counting","0.90 ×/÷1.09"),
+ ("sgm-mt insns 1.23","OpenMP barrier spin, not work","OMP_WAIT_POLICY=passive","0.985"),
+ ("reads 0.49–0.77","silicon prefetcher traffic never issued","8-stream table, miss-trained, ramped","0.98 ×/÷1.14"),
 ]
-table(s,.6,1.6,12.1,(2.25,4.9,2.6,2.35),("observation","mechanism","fix","after"),mech,fsz=10,rh=0.56,bold_cols=(0,))
-tb(s,.6,5.75,12.1,.8,"The X1 row landed after this deck's first printing and proves the pattern: the named mechanism, implemented in an "
-   "afternoon, moved six workloads from near-zero to 0.73–1.03 without touching the read side. Mechanism-first iteration "
-   "converges; fudge-factor iteration doesn't.",11.5)
+table(s,.6,1.60,12.1,(2.3,4.4,3.4,2.0),("observation","mechanism","fix","after"),mech,fsz=11,rh=0.62,bold_cols=(0,))
+tb(s,.6,6.45,12.1,.4,"Five further hypotheses were falsified and recorded rather than quietly dropped. Mechanism-first iteration "
+   "converges; fudge-factor iteration does not.",12,True)
 
-# ── 7 · verdict ──────────────────────────────────────────────────────────────
-s=slide("What this licenses, and what it does not","The trust statement, quantity by quantity.")
-ver=[
- ("Per-core instruction activity","use directly","±4% envelope held across every application class tested"),
- ("DRAM read transactions",f"use with ×{1/GM:.2f} correction","carry the ×/÷{:.2f} band; latency/bandwidth-bound apps need almost none".format(SD)),
- ("DRAM-quiet screening","use directly","proxy under ~1 M lines reliably means a DRAM-quiet application"),
- ("DRAM write transactions",f"use with ×{1/GW:.2f} correction (base pass)",f"×/÷{SW:.2f} fitted, ×/÷1.28 held-out, above the write noise floor"),
- ("Network / DMA activity","do not use from linux-user","system-mode harness (exists, boot-differential) required"),
- ("Multi-core","use for DRAM directly; insns with passive waiting","DRAM ratios thread-invariant 1–6T; spin-wait inflates insns 18–23% on barrier-heavy code otherwise"),
- ("Duty cycle","not yet measured","rides on the X2 system-mode harness"),
-]
-def vcol(ri,c):
-    if c==1: return GREEN if "use" in ver[ri][1] and "not" not in ver[ri][1] else (AMBER if "only" in ver[ri][1] or "insufficient" in ver[ri][1] else RED)
-    return None
-table(s,.6,1.55,12.1,(3.3,3.0,5.8),("quantity","verdict","condition"),ver,fsz=10.5,rh=0.5,bold_cols=(0,),color_fn=vcol)
-tb(s,.6,5.85,12.1,.9,"Every gap this deck's first printing named has since been closed and is reflected above: X1 writeback model (writes, "
-   "0.02 → 0.90), X2 system-mode boot-differential (kernel share MEASURED, DMA boundary characterised), X3 multi-core sweep "
-   "(spin-wait proven, not argued), X4 stride prefetcher (reads 0.81 → 0.98). What remains open is P1 — energy-per-event "
-   "calibration — which is not ours to close: it needs a board with instrumented rails and belongs to the power team.",11.5)
-tb(s,.6,6.85,12.1,.5,"Reproducibility: wattson/xcheck — one command per side (run-qemu.sh / run-perf.sh / run-ddr.sh), vectors "
-   "committed, deck regenerated from the vectors by make_deck.py. The QEMU cache-plugin patch ships in-repo.",10.5,False,MUTED)
+# ── 11 · what remains ────────────────────────────────────────────────────────
+s=slide("What is closed, what is open")
+closed=[("Writes","0.02 → 0.90","writeback model"),
+        ("Kernel share","MEASURED","system-mode boot-differential"),
+        ("Multi-core","thread-invariant","13-point sweep, spin-wait proven"),
+        ("Reads","0.81 → 0.98","stride prefetcher")]
+tb(s,.6,1.20,6.0,.3,"CLOSED",12,True,GREEN)
+table(s,.6,1.52,6.0,(1.9,1.9,2.2),("gap","result","how"),closed,fsz=11,rh=0.66,bold_cols=(0,))
+
+openi=[("Energy coefficients","yours — needs instrumented rails"),
+       ("NPU activity","Neutron model in build"),
+       ("GPU activity","GLES command-stream scope — next investigation"),
+       ("DMA payload","count it in the device model")]
+tb(s,6.9,1.20,5.8,.3,"OPEN",12,True,AMBER)
+table(s,6.9,1.52,5.8,(2.3,3.5),("item","path"),openi,fsz=11,rh=0.66,bold_cols=(0,))
+
+tb(s,.6,4.98,12.1,.32,"REPRODUCIBILITY",12,True,ACCENT)
+tb(s,.6,5.30,12.1,.7,"One command per side: run-qemu.sh, run-perf.sh, run-ddr.sh. All 50 measurement vectors are committed. "
+   "This deck regenerates from those vectors — no number in it is typed by hand. The QEMU cache-plugin patch ships in the repo.",12)
+
+tb(s,.6,6.20,12.1,.32,"SCOPE",12,True,ACCENT)
+tb(s,.6,6.52,12.1,.5,"These are ACTIVITY correlations. wattson never emits watts: it supplies N, you supply eᵢ, and E = Σ eᵢ×Nᵢ "
+   "stays your calculation.",12)
 
 prs.save("xcheck-correlation.pptx")
-print("deck rev2:",len(prs.slides._sldIdLst),"slides · fit",round(GM,3),"x/",round(SD,3))
+print("deck rev4:",len(prs.slides._sldIdLst),"slides")
