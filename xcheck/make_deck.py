@@ -63,7 +63,7 @@ def slide(title, kicker=None):
     rule=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,0,Inches(0.92),prs.slide_width,Pt(3))
     rule.fill.solid(); rule.fill.fore_color.rgb=ACCENT; rule.line.fill.background()
     if kicker: tb(s,.6,1.06,12.2,.4,kicker,12,False,MUTED)
-    tb(s,.6,7.14,10.5,.3,"wattson xcheck rev 2 · QEMU counts DERIVED, PMU/DDR counts MEASURED · 2026-08-30",9.5,False,MUTED)
+    tb(s,.6,7.14,10.5,.3,"wattson xcheck · QEMU counts DERIVED, PMU/DDR counts MEASURED · 2026-08-31",9.5,False,MUTED)
     tb(s,12.3,7.14,.5,.3,str(PAGE[0]),9.5,False,MUTED,PP_ALIGN.RIGHT)
     return s
 
@@ -94,7 +94,7 @@ band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,0,Inches(2.5),prs.slide_width,Inches
 band.fill.solid(); band.fill.fore_color.rgb=INK; band.line.fill.background()
 tb(s,.9,2.62,11.5,.55,"Activity factors for power modelling, measured in QEMU",27,True,WHITE)
 tb(s,.9,3.42,11.5,.5,"Validated against i.MX95 silicon · 50 applications · wattson / xcheck",15,False,RGBColor(0xC9,0xD4,0xE4))
-tb(s,.9,4.55,11.5,.4,"Kyle Fox · 2026-08-30",12,False,MUTED)
+tb(s,.9,4.55,11.5,.4,"Kyle Fox · 2026-08-31",12,False,MUTED)
 
 # ── 2 · the answer ───────────────────────────────────────────────────────────
 s=slide("Can we produce activity factors that match silicon?")
@@ -108,45 +108,45 @@ yes=[("Instructions, per core","use raw","0.979","×/÷1.04"),
      ("DRAM-quiet screening","yes/no","100%","—"),
      ("User + kernel instructions","system mode","10.0% kernel","measured")]
 tb(s,.6,2.05,6.0,.28,"WHAT WE PRODUCE",12,True,GREEN)
-table(s,.6,2.36,6.0,(2.4,1.3,1.15,1.15),("quantity","apply","held-out","spread"),yes,fsz=10,rh=0.42,bold_cols=(0,))
+table(s,.6,2.36,6.0,(2.4,1.3,1.15,1.15),("quantity","apply","held-out","spread"),yes,fsz=10.5,rh=0.46,bold_cols=(0,))
 
 no=[("Accelerator compute","NPU model in build; GPU next"),
     ("DMA payload bytes","known to the device model, not yet counted"),
     ("Core identity, DVFS point","QEMU has no frequency notion")]
 tb(s,6.9,2.05,5.8,.28,"NOT TODAY",12,True,RED)
-table(s,6.9,2.36,5.8,(2.4,3.4),("boundary","status"),no,fsz=10,rh=0.42,bold_cols=(0,))
+table(s,6.9,2.36,5.8,(2.4,3.4),("boundary","status"),no,fsz=10.5,rh=0.46,bold_cols=(0,))
 
-tb(s,.6,5.02,12.1,.32,"WHY THE NUMBERS TRANSFER TO AN APP NOBODY HAS MEASURED",12,True,ACCENT)
-tb(s,.6,5.34,12.1,.5,"Corrections were fitted on 14 applications, then applied cold to 36 the model had never seen. "
+tb(s,.6,5.22,12.1,.32,"WHY THE NUMBERS TRANSFER TO AN APP NOBODY HAS MEASURED",12,True,ACCENT)
+tb(s,.6,5.54,12.1,.5,"Corrections were fitted on 14 applications, then applied cold to 36 the model had never seen. "
    "They landed in the same bands. That is the whole licence.",13,True)
 
-tb(s,.6,6.02,12.1,.3,"THE HANDOFF",12,True,GREEN)
-tb(s,.6,6.32,12.1,.4,"afgen/afgen.sh my-apps.manifest afs/   →   one JSON per application: counts per run, provenance-tagged.",13,True,GREEN)
-tb(s,.6,6.76,12.1,.35,"Fifty apps in, fifty activity factors out. wattson supplies the counts; energy coefficients stay yours.",12,False,MUTED)
+tb(s,.6,6.20,12.1,.3,"THE HANDOFF",12,True,GREEN)
+tb(s,.6,6.50,12.1,.4,"afgen/afgen.sh my-apps.manifest afs/   →   one JSON per application: counts per run, provenance-tagged.",13,True,GREEN)
+tb(s,.6,6.92,12.1,.32,"Fifty apps in, fifty activity factors out. wattson supplies the counts; energy coefficients stay yours.",12,False,MUTED)
 
 # ── 3 · recommendation: the gate-AF bridge ───────────────────────────────────
 s=slide("Recommendation — the gate-activity bridge")
-tb(s,.6,1.16,12.2,.36,"Your spreadsheet wants a GATE activity factor. QEMU measures UTILIZATION. The bridge is a number you already have.",13,True)
+tb(s,.6,1.14,12.2,.34,"Your spreadsheet wants a GATE activity factor. QEMU measures UTILIZATION. The bridge is a number you already have.",12.5,True)
 
 lft=[("your model","fraction of gates toggling per clock: 0% / 3% / 5% / 7%. 5% = block maxed out. Assumed per block."),
      ("what we measure","events actually executed: instructions, DRAM transactions, cache accesses. Per application."),
      ("the gap","utilization is not gate toggling — but your 5% anchor already contains the gates-per-event constant.")]
-table(s,.6,1.62,12.1,(2.0,10.1),("","")  if False else ("term","meaning"),lft,fsz=11,rh=0.44,bold_cols=(0,))
+table(s,.6,1.72,12.1,(2.0,10.1),("term","meaning"),lft,fsz=11,rh=0.46,bold_cols=(0,))
 
-box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(3.35),Inches(12.1),Inches(1.15))
+box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(3.42),Inches(12.1),Inches(1.15))
 box.fill.solid(); box.fill.fore_color.rgb=ZEBRA; box.line.color.rgb=ACCENT; box.line.width=Pt(1.5)
-tb(s,.9,3.48,11.5,.4,"AF_app   =   AF_idle  +  ( AF_max − AF_idle ) × U",20,True,ACCENT,font="Consolas")
-tb(s,.9,3.95,11.5,.45,"AF_max = your existing 5% anchor.   U = measured activity ÷ the same block saturated, both from QEMU.   "
+tb(s,.9,3.55,11.5,.4,"AF_app   =   AF_idle  +  ( AF_max − AF_idle ) × U",20,True,ACCENT,font="Consolas")
+tb(s,.9,4.02,11.5,.45,"AF_max = your existing 5% anchor.   U = measured activity ÷ the same block saturated, both from QEMU.   "
    "No gate counts needed: your anchor already holds that constant.",12,False,INK)
 
 rec=[("1","Pick the saturating reference per block","we ship the microbenches: alu saturates the pipeline, mem the memory system"),
      ("2","Measure the application","afgen gives counts; U = app activity ÷ saturating activity"),
      ("3","Scale your existing anchor","AF = 5% × U. Spreadsheet unchanged, physics unchanged, one guess replaced"),
      ("4","Validate once on silicon","two rail measurements — idle and saturated — confirm the anchor is linear in U")]
-table(s,.6,4.66,12.1,(0.5,4.3,7.3),("#","step","what it means"),rec,fsz=10.5,rh=0.42,bold_cols=(1,))
+table(s,.6,4.70,12.1,(0.5,4.3,7.3),("#","step","what it means"),rec,fsz=10,rh=0.40,bold_cols=(1,))
 
-tb(s,.6,6.62,12.1,.42,"THE TURN-AROUND:  today you assume 3% and get the power of an abstraction. This way you name an application — "
-   "\"what does Pac-Man cost?\" — and get the power of that application.",13,True,GREEN)
+tb(s,.6,6.74,12.1,.36,"THE TURN-AROUND: today you assume 3% and get the power of an abstraction. Name an application instead — "
+   "\"what does Pac-Man cost?\" — and get the power of that application.",12,True,GREEN)
 
 # ── 4 · what we can hand over ────────────────────────────────────────────────
 s=slide("Three levels of detail — all available today")
@@ -157,16 +157,16 @@ tiers=[("1 · counts per run","instructions, DRAM reads/writes, cache accesses p
        ("3 · full instruction trace","every instruction in order, with its memory accesses","AF as a time series","upstream plugin, large output")]
 table(s,.6,1.62,12.1,(2.9,5.0,2.0,2.2),("what you get","content","what it buys you","status"),tiers,fsz=10.5,rh=0.52,bold_cols=(0,))
 
-tb(s,.6,3.92,12.1,.32,"WHY LEVEL 2 MATTERS — MEASURED, TWO REAL APPLICATIONS ON THE SAME CORE",12,True,ACCENT)
+tb(s,.6,3.80,12.1,.32,"WHY LEVEL 2 MATTERS — MEASURED, TWO REAL APPLICATIONS ON THE SAME CORE",12,True,ACCENT)
 mix=[("integer ALU","28.1%","36.9%"),("load / store","52.2%","41.9%"),("branch","19.7%","19.9%"),
      ("FP / SIMD","0.1%","1.3%"),("total instructions","2.57 B","25.7 B")]
-table(s,.6,4.24,6.6,(2.6,2.0,2.0),("instruction class","SQLite","Pac-Man"),mix,fsz=10,rh=0.36,bold_cols=(0,))
+table(s,.6,4.12,6.6,(2.6,2.0,2.0),("instruction class","SQLite","Pac-Man"),mix,fsz=10.5,rh=0.42,bold_cols=(0,))
 
-tb(s,7.5,4.24,5.2,.4,"Same CPU block. Same flat 5% anchor would give both the same answer.",12,True)
-tb(s,7.5,4.78,5.2,1.6,"SQLite spends over half its instructions in load/store; Pac-Man is a third more ALU-heavy and toggles "
+tb(s,7.5,4.12,5.2,.4,"Same CPU block. Same flat 5% anchor would give both the same answer.",12,True)
+tb(s,7.5,4.66,5.2,1.6,"SQLite spends over half its instructions in load/store; Pac-Man is a third more ALU-heavy and toggles "
    "13× the FP/SIMD share. Those light up different gates. A per-class AF separates them; a single AF cannot.",11.5,False,INK)
 
-tb(s,.6,6.62,12.1,.4,"Levels 2 and 3 are stock upstream QEMU plugins (howvec, execlog) — the numbers above were produced with them, "
+tb(s,.6,6.70,12.1,.4,"Levels 2 and 3 are stock upstream QEMU plugins (howvec, execlog) — the numbers above were produced with them, "
    "unmodified, this evening. Nothing new has to be written to supply either.",11.5,False,MUTED)
 
 # ── 5 · the numbers ──────────────────────────────────────────────────────────
@@ -191,31 +191,54 @@ tb(s,.6,6.50,12.1,.4,"Two instrument findings: the A55 PMU's l3d_cache_refill co
 # ── 6 · method ───────────────────────────────────────────────────────────────
 s=slide("Method — one binary, two observatories")
 tb(s,.6,1.16,12.2,.34,"Identical static aarch64 binaries. Nothing recompiled between the two worlds.",13,True)
-for x0,hdr,lines in ((0.6,"QEMU  (derived)",[
-    "qemu-aarch64 + TCG plugins",
-    "Cache model = the board's own hierarchy, from its sysfs:",
+PANELS=((0.6,"QEMU  (derived)",[
+    "qemu-aarch64 + TCG plugins (libinsn, libcache)",
+    "Cache model = the board's own hierarchy, read from its sysfs:",
     "L1 32K/4w · L2 64K/4w · shared L3 512K/16w, 64 B lines",
-    "A55 write-streaming, writeback, stride prefetcher modelled",
-    "L3 misses → read proxy · evictions → write proxy"]),
+    "A55 write-streaming, writeback and a stride prefetcher modelled",
+    "L3 misses → DRAM-read proxy · evictions → DRAM-write proxy",
+    "Two passes per app: prefetch pass for reads, base pass for writes",
+    "Counts are per-run and frequency-free"]),
   (6.85,"Silicon  (measured)",[
     "FRDM-IMX95, perf stat, pinned to A55 core 0",
-    "Core PMU: instructions, cycles, L1/L2/L3 refills",
+    "Core PMU: instructions, cycles, L1/L2/L3 refill events",
     "imx9_ddr0 DDR-controller PMU: read/write beats (32 B)",
     "System-wide, with an equal-duration idle window subtracted",
-    "The DDR controller sees prefetch traffic the core PMU cannot"])):
-    box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(x0),Inches(1.58),Inches(5.9),Inches(2.75))
+    "The DDR controller sees prefetch traffic the core PMU cannot",
+    "Medians of repeated runs, spreads recorded",
+    "The same static binary is copied over, never rebuilt"]))
+for x0,hdr,lines in PANELS:
+    box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(x0),Inches(1.58),Inches(5.9),Inches(2.45))
     box.fill.solid(); box.fill.fore_color.rgb=ZEBRA; box.line.color.rgb=ACCENT; box.line.width=Pt(1.2)
-    tb(s,x0+.25,1.72,5.4,.35,hdr,15,True,ACCENT)
-    tf=tb(s,x0+.25,2.15,5.5,1.9,lines[0],11)
+    tb(s,x0+.25,1.68,5.4,.32,hdr,14,True,ACCENT)
+    tf=tb(s,x0+.25,2.02,5.45,2.0,lines[0],10.5)
+    tf.paragraphs[0].space_after=Pt(6)
     for ln in lines[1:]:
-        p=tf.add_paragraph(); r=p.add_run(); r.text=ln; r.font.size=Pt(11); r.font.name="Calibri"; r.font.color.rgb=INK
-tb(s,.6,4.58,12.1,.32,"THE 50 APPLICATIONS",12,True,ACCENT)
-tb(s,.6,4.92,12.1,.9,"14 development apps: five microbench corners (ALU, streaming, pointer-chase, matmul, sort) plus stereo "
-   "vision, two compressors, an interpreter, SHA-256, a JSON codec, SQLite, a game-AI trainer, an HTTP client.\n"
-   "36 held-out apps, never seen by the model: busybox applets, crypto kernels, software renderers, bignum, "
-   "hashing, parsers, sockets.",12)
-tb(s,.6,6.55,12.1,.4,"Every app prints a checksum so dead-code elimination cannot fake a result; the vision app is hash-gated "
-   "bit-exact against its published golden.",11.5,False,MUTED)
+        p=tf.add_paragraph(); p.space_after=Pt(6)
+        rr=p.add_run(); rr.text=ln; rr.font.size=Pt(10.5); rr.font.name="Calibri"; rr.font.color.rgb=INK
+BLOCKS=((0.6,"THE 50 APPLICATIONS",[
+    "14 development apps — five microbench corners (ALU, streaming,",
+    "pointer-chase, matmul, sort) plus stereo vision, two compressors,",
+    "an interpreter, SHA-256, a JSON codec, SQLite, a game-AI trainer",
+    "and an HTTP client.",
+    "36 held-out apps, never seen by the model — busybox applets,",
+    "crypto kernels, software renderers, bignum, hashing, parsers, sockets."]),
+  (6.85,"HOW A RUN IS ACCEPTED",[
+    "Every app prints a checksum, so dead-code elimination cannot",
+    "fake a result by optimising the work away.",
+    "The vision app is hash-gated bit-exact against its published golden.",
+    "Instruction agreement must pass before any cache-level number",
+    "is read — a wrong instruction count invalidates everything downstream.",
+    "DDR counts are idle-corrected over an equal-duration window."]))
+for x0,hdr,lines in BLOCKS:
+    box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(x0),Inches(4.22),Inches(5.9),Inches(2.48))
+    box.fill.solid(); box.fill.fore_color.rgb=WHITE; box.line.color.rgb=RGBColor(0xC4,0xCE,0xDB); box.line.width=Pt(1.0)
+    tb(s,x0+.25,4.32,5.4,.30,hdr,12,True,ACCENT)
+    tf=tb(s,x0+.25,4.66,5.45,1.95,lines[0],10.5)
+    tf.paragraphs[0].space_after=Pt(7)
+    for ln in lines[1:]:
+        p=tf.add_paragraph(); p.space_after=Pt(7)
+        rr=p.add_run(); rr.text=ln; rr.font.size=Pt(10.5); rr.font.name="Calibri"; rr.font.color.rgb=INK
 
 # ── 7 · gate 1 ───────────────────────────────────────────────────────────────
 s=slide("Gate 1 — instructions agree")
