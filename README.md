@@ -52,11 +52,21 @@ user can point a tool at an application nobody has measured and get activity
 factors that match silicon, for **CPU and DRAM activity on a non-accelerated
 workload**, within the bands in that table. Instructions need no correction at
 all; reads take ×1.02 and carry ×/÷1.21; writes take ×1.11 and carry ×/÷1.28.
-*No* for three things, stated as plainly: accelerator compute (the emulator does
-not execute it), the kernel and DMA share from linux-user (visible only in
-system mode, where it is measured), and anything requiring a **rate** — counts
-are time-free, so watts need a duration and energy coefficients that belong to
-the power team.
+Kernel instructions are **in scope, not excluded** — the system-mode harness
+measures user + kernel together by boot-differential (sha256's kernel share:
+10.0%; a networking workload's: 16.7%). Today's real boundaries are narrower
+than they look: **accelerator compute** (QEMU does not execute GPU/VPU/NPU work,
+so there is no activity to count — a Neutron NPU model is in build, and a GPU
+activity scope off the GLES command stream is the next investigation), **DMA
+payload bytes** (a device model writes guest memory without going through TCG,
+so no CPU-side plugin sees it — the bytes are known exactly to the device model,
+making this an instrumentation gap rather than an unknown), and **core identity
+and DVFS state**, which QEMU has no notion of and which belong to the power
+model.
+
+Power itself was never in scope and is not a limitation: wattson supplies **N**,
+the power team supplies **eᵢ**, and the deliverable is a counts-per-run vector
+that drops into their spreadsheet as the N column of `E = Σ eᵢ×Nᵢ`.
 
 That the two halves combine is the whole argument: **deep** earned the
 corrections (14 apps, mechanism by mechanism, five falsified hypotheses),

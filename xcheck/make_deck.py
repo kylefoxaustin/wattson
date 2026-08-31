@@ -97,7 +97,41 @@ tb(s,.9,3.35,11.5,.6,"wattson cross-check (xcheck) · rev 3 · tested DEEP (14 a
 tb(s,.9,4.6,11.5,.6,"Thesis under test: a functional emulator's activity counts — instructions retired, cache-model misses —\ntrack what the silicon actually does closely enough to anchor per-event power estimation.",13,False,MUTED)
 tb(s,.9,6.8,11.5,.4,"Kyle Fox · measured on FRDM-IMX95 silicon + qemu-aarch64 TCG plugins · 2026-08-30",11,False,MUTED)
 
-# ── 2 · executive summary ────────────────────────────────────────────────────
+# ── 2 · the verdict (the answer, up front) ──────────────────────────────────
+s=slide("Can a user get activity factors that match silicon?",
+        "The question this whole campaign exists to answer, answered.")
+band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(.6),Inches(1.45),Inches(12.1),Inches(1.0))
+band.fill.solid(); band.fill.fore_color.rgb=RGBColor(0x0E,0x5C,0x2B); band.line.fill.background()
+band.height=Inches(1.05)
+tb(s,.9,1.52,11.6,.45,"YES — for CPU and DRAM activity, within the bands below.",20,True,WHITE)
+tb(s,.9,1.92,11.6,.4,"Not 'yes in principle'. The corrections were fitted on 14 applications and then held on 36 the model had never seen, "
+   "with the SAME spread — which is the user's situation exactly: an app nobody has measured.",11.5,False,RGBColor(0xC9,0xE4,0xD4))
+
+yes=[("Instructions, per core","×1.00 — use raw","0.979 ×/÷1.04 on 36 unseen apps"),
+     ("DRAM reads","×1.02","×/÷1.21 held out — identical to the fitted set"),
+     ("DRAM writes","×1.11","×/÷1.28 held out — the widest band; treat as an envelope"),
+     ("Is this app DRAM-quiet?","yes/no, no correction","every quiet app classified correctly, both sets"),
+     ("User AND kernel instructions","boot-differential, system mode","kernel+system share MEASURED: sha256 10.0%, networking 16.7%")]
+tb(s,.6,2.62,6.0,.3,"WHAT YOU GET, AND WHAT IT IS WORTH",12,True,GREEN)
+table(s,.6,2.95,6.0,(2.3,1.5,2.2),("quantity","apply","held-out evidence"),yes,fsz=8.5,rh=0.44,bold_cols=(0,))
+
+no=[("Accelerator compute — TODAY","the emulator does not execute GPU/VPU/NPU work, so there is no activity to count. Moving: a Neutron NPU model is in build now; a GPU AF scope off the GLES command stream is the next investigation"),
+    ("DMA payload bytes","a device model writes guest memory without going through TCG, so no CPU-side plugin can see it. The bytes are known exactly to the device model — this is an instrumentation gap, not an unknown"),
+    ("Which core, at what DVFS point","QEMU has no frequency or core-type notion. Counts are per-vCPU and frequency-free; mapping them onto big/LITTLE and an OPP is the power model's job")]
+tb(s,6.9,2.62,5.8,.3,"TODAY'S BOUNDARIES",12,True,RED)
+table(s,6.9,2.95,5.8,(1.9,3.9),("boundary","why"),no,fsz=8.5,rh=0.62,bold_cols=(0,))
+
+tb(s,.6,5.70,12.1,.7,"HOW THE TWO HALVES COMBINE. DEEP earned the corrections: 14 applications iterated mechanism by mechanism — a "
+   "silicon-matched cache hierarchy, A55 write-streaming, a writeback model, a stride prefetcher — with five hypotheses falsified "
+   "and recorded on the way. BROAD proved they are not curve-fits: 36 further applications, measured cold, land in the same bands. "
+   "Deep alone would be a tuned demo; broad alone would be a coincidence. Together they are a licence to use the numbers on an "
+   "application nobody has run yet.",11,True)
+tb(s,.6,6.62,12.1,.45,"THE HANDOFF:   afgen/afgen.sh my-apps.manifest afs/   →   one activity-factor JSON per application — counts per run, "
+   "ready to paste into the power team's spreadsheet as the N column of E = Σ eᵢ×Nᵢ. Fifty apps in, fifty AFs out.",10.5,True,GREEN)
+tb(s,.6,7.06,12.1,.35,"By design, wattson supplies N and never eᵢ: the energy coefficients are the power team's half of the equation. These bands "
+   "are what the ACTIVITY column is worth.",8.5,False,MUTED)
+
+# ── 3 · executive summary ────────────────────────────────────────────────────
 s=slide("Executive summary","Everything on one slide; the rest of the deck is evidence.")
 data=[
  ("Generalization (the gate)","corrections fitted on 14 apps HELD on 36 unseen apps: insns 0.979 ×/÷1.04, reads transfer with identical ×/÷1.21 spread","VALIDATED — 50-app held-out"),
@@ -220,39 +254,6 @@ tb(s,.6,5.85,12.1,.9,"Every gap this deck's first printing named has since been 
    "calibration — which is not ours to close: it needs a board with instrumented rails and belongs to the power team.",11.5)
 tb(s,.6,6.85,12.1,.5,"Reproducibility: wattson/xcheck — one command per side (run-qemu.sh / run-perf.sh / run-ddr.sh), vectors "
    "committed, deck regenerated from the vectors by make_deck.py. The QEMU cache-plugin patch ships in-repo.",10.5,False,MUTED)
-
-# ── 9 · the verdict ─────────────────────────────────────────────────────────
-s=slide("Can a user get activity factors that match silicon?",
-        "The question this whole campaign exists to answer, answered.")
-band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(.6),Inches(1.45),Inches(12.1),Inches(1.0))
-band.fill.solid(); band.fill.fore_color.rgb=RGBColor(0x0E,0x5C,0x2B); band.line.fill.background()
-band.height=Inches(1.05)
-tb(s,.9,1.52,11.6,.45,"YES — for CPU and DRAM activity, within the bands below.",20,True,WHITE)
-tb(s,.9,1.92,11.6,.4,"Not 'yes in principle'. The corrections were fitted on 14 applications and then held on 36 the model had never seen, "
-   "with the SAME spread — which is the user's situation exactly: an app nobody has measured.",11.5,False,RGBColor(0xC9,0xE4,0xD4))
-
-yes=[("Instructions, per core","×1.00 — use raw","0.979 ×/÷1.04 on 36 unseen apps"),
-     ("DRAM reads","×1.02","×/÷1.21 held out — identical to the fitted set"),
-     ("DRAM writes","×1.11","×/÷1.28 held out — the widest band; treat as an envelope"),
-     ("Is this app DRAM-quiet?","yes/no, no correction","every quiet app classified correctly, both sets")]
-tb(s,.6,2.62,6.0,.3,"WHAT YOU GET, AND WHAT IT IS WORTH",12,True,GREEN)
-table(s,.6,2.95,6.0,(2.3,1.5,2.2),("quantity","apply","held-out evidence"),yes,fsz=9.5,rh=0.46,bold_cols=(0,))
-
-no=[("Accelerator compute","GPU / VPU / NPU work is not modelled — the emulator does not execute it"),
-    ("Kernel & DMA share","invisible from linux-user by construction; the system-mode harness exists and measures it (sha256: 10.0%)"),
-    ("Rates, and therefore watts","counts are time-free. A rate needs a duration, and an energy needs coefficients — both belong to the power team")]
-tb(s,6.9,2.62,5.8,.3,"WHAT IT DOES NOT GIVE YOU",12,True,RED)
-table(s,6.9,2.95,5.8,(1.9,3.9),("boundary","why"),no,fsz=9.5,rh=0.62,bold_cols=(0,))
-
-tb(s,.6,5.30,12.1,.75,"HOW THE TWO HALVES COMBINE. DEEP earned the corrections: 14 applications iterated mechanism by mechanism — a "
-   "silicon-matched cache hierarchy, A55 write-streaming, a writeback model, a stride prefetcher — with five hypotheses falsified "
-   "and recorded on the way. BROAD proved they are not curve-fits: 36 further applications, measured cold, land in the same bands. "
-   "Deep alone would be a tuned demo; broad alone would be a coincidence. Together they are a licence to use the numbers on an "
-   "application nobody has run yet.",11,True)
-tb(s,.6,6.42,12.1,.5,"WHAT THE USER ACTUALLY RUNS:   afgen/afgen.sh my-apps.manifest afs/   →   one activity-factor JSON per application, "
-   "every field provenance-tagged with its correction and band. Fifty apps in, fifty activity factors out.",11,True,GREEN)
-tb(s,.6,6.9,12.1,.4,"⚠️ These are ACTIVITY bands, not power bands: they license the count vector N in E = Σ eᵢ×Nᵢ. What a ×/÷1.21 read band "
-   "costs a final energy number depends on the weights eᵢ — the power team's half, and why wattson never prints a watt.",9.5,False,MUTED)
 
 prs.save("xcheck-correlation.pptx")
 print("deck rev2:",len(prs.slides._sldIdLst),"slides · fit",round(GM,3),"x/",round(SD,3))
