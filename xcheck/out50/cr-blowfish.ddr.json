@@ -1,0 +1,3 @@
+{"schema":"wattson/xcheck-ddr/v1","workload":"cr-blowfish","dur_s":0.163,
+ "rd_beats_run":541742,"wr_beats_run":554940,"rd_beats_idle":60952,"wr_beats_idle":18616,
+ "rd_beats_net":480790,"wr_beats_net":536324}

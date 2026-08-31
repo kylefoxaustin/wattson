@@ -1,0 +1,13 @@
+bb-gzip       ./apps/busybox gzip -9 -c ./apps/big.bin
+bb-gunzip     ./apps/busybox gunzip -c ./apps/data.bin.gz
+bb-sha1       ./apps/busybox sha1sum ./apps/big.bin
+bb-md5        ./apps/busybox md5sum ./apps/big.bin
+bb-sha512     ./apps/busybox sha512sum ./apps/big.bin
+bb-awk        ./apps/busybox awk -F, {s+=$3;n++}END{print(s/n)} ./apps/big.txt
+bb-sed        ./apps/busybox sed s/status=OK/status=PASS/g ./apps/big.txt
+bb-grep       ./apps/busybox grep -cE (gamma|delta),[0-9]{4}, ./apps/big.txt
+bb-sortn      ./apps/busybox sort -t, -k3 -n ./apps/big.txt
+bb-cksum      ./apps/busybox cksum ./apps/big.bin
+bb-b64        ./apps/busybox base64 ./apps/big.bin
+bb-wc         ./apps/busybox wc ./apps/big.txt
+sgm-a55-1t    ./apps/app-sgma55 ./apps/syn_left.pgm ./apps/syn_right.pgm -t 1 -n 1

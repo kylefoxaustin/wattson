@@ -1,0 +1,3 @@
+{"schema":"wattson/xcheck-ddr/v1","workload":"pcg","dur_s":0.570,
+ "rd_beats_run":107849,"wr_beats_run":29916,"rd_beats_idle":127140,"wr_beats_idle":33689,
+ "rd_beats_net":-19291,"wr_beats_net":-3773}

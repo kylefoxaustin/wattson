@@ -197,3 +197,31 @@ Three rounds, each mechanism-driven:
 prefetcher pass (correction ~1.02, band ×/÷1.14); WRITES from the base pass
 (0.90 ×/÷1.09, X1). Each quantity from the configuration that models it best;
 the lz4 prefetch×writeback interaction is the recorded open item.
+
+---
+# THE 50-APP HELD-OUT VALIDATION (same day): the variances hold
+
+Kyle's design: the 14-app suite the correction factors were fitted on becomes
+the TRAINING set; 36 new applications (busybox applets over an 18MB corpus,
+five crypto kernels, four soft-renderers, six library workloads, nine
+parameter variants incl. Config-A SGM) are HELD OUT. Same binaries, QEMU
+two-pass extraction vs FRDM perf + DDR-controller windows.
+
+    quantity   TRAIN (fitted)      HELD OUT (never seen)
+    insns      0.998 x/÷ 1.02      0.979 x/÷ 1.04   (n=37)
+    reads      1.01  x/÷ 1.21      0.91  x/÷ 1.21   (n=12)
+    writes     0.90  x/÷ 1.09      0.83  x/÷ 1.28   (n=9)
+
+- The read band TRANSFERS with identical spread; writes transfer with modest
+  widening (the one outlier, Config-A sgm at 0.49 wr, is a different kernel's
+  write pattern — noted). Instruction agreement holds at the percent level on
+  all 37, with the small busybox applets dipping to 0.85–0.99 (exec/loader
+  kernel share visible on short runs).
+- Two-thirds of a realistic population is DRAM-quiet and the proxy correctly
+  classifies every one of them.
+- One harness bug found and fixed en route: busybox dispatches on argv[0], so
+  'app-busybox gzip' measured an error message (343K insns) on both sides —
+  caught because the numbers were impossible, re-run with the binary renamed.
+
+VERDICT: corrections fitted on 14 applications hold on 37 they never saw.
+The activity-factor pipeline (afgen) generalizes. scatter50.png is the figure.

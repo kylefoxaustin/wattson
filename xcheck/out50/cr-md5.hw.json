@@ -1,0 +1,15 @@
+{
+ "schema": "wattson/xcheck-hw/v1",
+ "workload": "cr-md5",
+ "provenance": "MEASURED PMU counts on i.MX95 FRDM (A55 core 0, pinned)",
+ "instructions": 1546841628,
+ "cycles": 1146624874,
+ "cache-misses": 94234,
+ "l1d_cache": 237986377,
+ "l1d_cache_refill": 93518,
+ "l2d_cache": 2739366,
+ "l2d_cache_refill": 1276039,
+ "l3d_cache": 2321704,
+ "l3d_cache_refill": 55966,
+ "end": 1
+}

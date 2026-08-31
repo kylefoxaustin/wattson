@@ -1,0 +1,3 @@
+{"schema":"wattson/xcheck-ddr/v1","workload":"sgm-a55-1t","dur_s":17.669,
+ "rd_beats_run":168046362,"wr_beats_run":213139931,"rd_beats_idle":1162028,"wr_beats_idle":273320,
+ "rd_beats_net":166884334,"wr_beats_net":212866611}
