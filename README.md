@@ -47,8 +47,21 @@ workloads:
 
 ![50-app held-out validation](xcheck/scatter50.png)
 
-The corrections generalize: a variance projection built on 14 applications
-predicted 36 it had never seen. Multi-core survives too (DRAM ratios
+**The verdict, since a campaign that never concludes is just data:** *yes* — a
+user can point a tool at an application nobody has measured and get activity
+factors that match silicon, for **CPU and DRAM activity on a non-accelerated
+workload**, within the bands in that table. Instructions need no correction at
+all; reads take ×1.02 and carry ×/÷1.21; writes take ×1.11 and carry ×/÷1.28.
+*No* for three things, stated as plainly: accelerator compute (the emulator does
+not execute it), the kernel and DMA share from linux-user (visible only in
+system mode, where it is measured), and anything requiring a **rate** — counts
+are time-free, so watts need a duration and energy coefficients that belong to
+the power team.
+
+That the two halves combine is the whole argument: **deep** earned the
+corrections (14 apps, mechanism by mechanism, five falsified hypotheses),
+**broad** proved they are not curve-fits (36 apps, measured cold). Deep alone
+would be a tuned demo; broad alone would be a coincidence. Multi-core survives too (DRAM ratios
 thread-invariant across a 1/2/4/6-thread sweep; the one +23% instruction
 outlier was *proven* to be OpenMP barrier spin — passive waiting collapses it
 to 0.985). Kernel share is measurable by boot-differential (sha256: 10.0%
