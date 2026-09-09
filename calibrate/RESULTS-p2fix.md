@@ -107,3 +107,80 @@ uncorrelated with core-rail power. It already carries `data_misses` and
 published PMC models actually use. **The core AF must be built on memory traffic
 as well as instruction count, or it will mis-rank exactly the workloads that
 matter.**
+
+---
+
+## Loop closure — QEMU counters through the model — AND A CORE-COUNT TERM
+
+### First: does QEMU's activity match the silicon's own PMU?
+
+Same deterministic static binary (`workloads/linux/probe.c`, fixed iteration
+counts, no wall-clock dependence) run on the EVK under `perf` and under
+`qemu-aarch64` with the TCG insn + cache plugins.
+
+| workload | counter | silicon PMU | QEMU | error |
+|---|---|---:|---:|---:|
+| alu | `inst_retired` / `total_insns` | 1,201,601,070 | 1,200,039,789 | **0.1%** |
+| mem | `inst_retired` / `total_insns` | 213,267,051 | 205,561,916 | **3.6%** |
+| mem | `l2d_cache_refill` / `data_misses` | 4,283,525 | 5,243,303 | **+22.4%** |
+
+**QEMU's instruction counts are essentially exact.** Its miss count runs ~25%
+high, and first principles say the silicon is the correct one: the `mem` workload
+streams 64 MiB x 4 passes and, with write-allocate, `b[i] += 3; s += b[i]` costs
+ONE line fill per 64 B → 4,194,304 expected. Silicon measured 4,283,525 = **102%
+of theory**; QEMU's 5,243,303 = **125%**. A consistent correctable bias, not noise.
+
+⚠️ The `alu` miss comparison shows "99% error" (silicon 46,679 vs QEMU 375) and
+means nothing: that workload has no memory traffic, `perf` counts the whole
+process including libc startup and kernel entries, and a percentage error on a
+near-zero denominator is exactly the trap that produced the retracted P1b PASS.
+
+### Then: drive the model from QEMU and compare to the rails
+
+QEMU supplies COUNTS; the board supplies TIME (`timing.wall_ns`) — QEMU has no
+clock worth trusting, which is the whole design.
+
+⭐ **QEMU-driven and PMU-driven predictions agree with each other** (644.1 vs
+644.9 mW on the alu case). Feeding the model the emulator's counters gives
+essentially the same answer as feeding it the silicon's own counters. **The
+emulator half works.**
+
+But both were 38–55% off the measured `vdd_arm` — so the error was in the MODEL,
+not in QEMU.
+
+### The missing term: ACTIVE CORES
+
+Direct evidence: grid point `(2,0)` ran **598 aluM/s on 2 cores → 656 mW**; the
+single-core probe ran **599 aluM/s on 1 core → 465 mW**. Same aggregate op rate,
+40% different power. Aggregate rate cannot express it; each active core carries
+fixed overhead (clock tree, pipeline, L1).
+
+| rail | model | in-sample R² | out-of-sample (alu / mem) |
+|---|---|---:|---|
+| `vdd_arm` | 2-term | 0.9896 | 38.5% / 54.6% |
+| `vdd_arm` | **3-term** | **0.9924** | **5.1% / 4.2%** |
+| `vdd_soc` | **2-term** | 0.9596 | **3.2% / 6.5%** |
+| `vdd_soc` | 3-term | 0.9709 | 11.3% / 14.1% |
+
+### 🔴 AND `vdd_soc`'s 3-TERM FIT IS A TEXTBOOK OVERFIT, CAUGHT LIVE
+
+Its in-sample R² **rose** (0.9596 → 0.9709) while out-of-sample error **tripled**
+(3.2% → 11.3%). Its core coefficient came out **negative (−73.1 mW per core)**,
+which is unphysical — more active cores cannot reduce SoC power. Cause: in the
+grid `active_cores = n_alu + n_mem`, partly collinear with the other two
+regressors, so the fit bought R² by absorbing variance into a meaningless term.
+
+That is Walker et al.'s warning — **coefficient stability beats fit quality** —
+reproduced in our own data within an hour of reading it. The higher R² was the
+wrong thing to optimise and only the held-out test exposed it.
+
+## THE MODELS (both @ 1800 MHz, both QEMU-drivable)
+
+    vdd_arm ≈ 243.8 + 0.1266·(ALU Mops/s) + 60.6·(GB/s) + 169.3·(active cores)
+    vdd_soc ≈ 851.0 + 0.0043·(ALU Mops/s) + 20.4·(GB/s)
+
+    out-of-sample: vdd_arm 4–5%,  vdd_soc 3–7%
+
+Different term counts per rail, deliberately: the core term earns its place on
+`vdd_arm` and fails the held-out test on `vdd_soc`. Using the same functional
+form for both would have looked tidier and been wrong.
