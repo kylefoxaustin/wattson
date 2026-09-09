@@ -2,11 +2,27 @@
    so QEMU exits cleanly and TCG plugins flush their counts. */
     .equ REGION_START, 0x80200000
     .equ REGION_SIZE,  0x10000000      /* 256 MiB */
+    .ifndef PASSES_OV
     .equ PASSES,       4
+    .else
+    .equ PASSES,       PASSES_OV
+    .endif
+    /* LPUART1 = the i.MX95 console. U-Boot has configured baud already, so a
+       polled write to DATA is enough. Markers exist because a bare-metal
+       workload that finished and one that hung both leave a silent console -
+       and on silicon, under a power meter, we must know WHICH WINDOW was the
+       workload. */
+    .equ LPUART1_BASE,  0x44380000
+    .equ LPUART_STAT,   0x14
+    .equ LPUART_DATA,   0x1c
+    .equ LPUART_TDRE,   23
+
     .equ PSCI_SYSTEM_OFF, 0x84000008
     .section .text.startup, "ax"
     .global _start
 _start:
+    adr     x9, m_start
+    bl      puts
     ldr     x20, =REGION_START
     ldr     x21, =REGION_SIZE
     add     x21, x20, x21
@@ -27,8 +43,25 @@ _start:
     b.lo    .Lrd
     subs    x22, x22, #1
     b.ne    .Louter
+    adr     x9, m_done
+    bl      puts
     ldr     x0, =PSCI_SYSTEM_OFF
     smc     #0
 .Lhalt:
     wfi
     b       .Lhalt
+
+    .section .text
+puts:
+    ldr     x12, =LPUART1_BASE
+1:  ldrb    w10, [x9], #1
+    cbz     w10, 3f
+2:  ldr     w11, [x12, #LPUART_STAT]
+    tbz     w11, #LPUART_TDRE, 2b
+    str     w10, [x12, #LPUART_DATA]
+    b       1b
+3:  ret
+
+    .section .rodata
+m_start: .asciz "\r\n>>> BENCH-MEM START <<<\r\n"
+m_done:  .asciz "\r\n>>> BENCH-MEM DONE <<<\r\n"

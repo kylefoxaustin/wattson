@@ -8,3 +8,8 @@ __pycache__/
 
 # xcheck build artifact
 xcheck/microbench
+# built binaries that are reproducible from source with a documented --defsym;
+# the QEMU-size .bin files ARE committed (the harness runs out of the box), the
+# silicon-size ones are not, because their size is a per-board choice
+workloads/bench-*-silicon.bin
+workloads/linux/bench
