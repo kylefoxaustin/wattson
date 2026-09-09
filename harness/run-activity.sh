@@ -32,10 +32,18 @@ BIN="$1"; LABEL="$2"; NOTE="${3:-}"
 [ -f "$BIN" ] || { echo "no workload at $BIN" >&2; exit 1; }
 
 LOG="$(mktemp)"; trap 'rm -f "$LOG"' EXIT
+# Time the run. The activity counts are TOTALS and power is a RATE; without a
+# duration the vector cannot be asked about rates at all. This is HOST wall time
+# under TCG - not guest time, not silicon time - and it is labelled as such all
+# the way into the JSON so nobody downstream mistakes it for a silicon figure.
+_t0=$(date +%s%N)
 timeout "$TMO" "$QEMU" -M imx95-19x19-evk -nographic -m "$MEM" -kernel "$BIN" \
     -plugin "$PLUGINS_INSN" \
     -plugin "$PLUGINS_CACHE" \
     -d plugin 2>"$LOG" || true
+_t1=$(date +%s%N)
+WALL_NS=$(( _t1 - _t0 ))
 
 grep -q "total insns:" "$LOG" || { echo "plugins did not flush -- did the workload PSCI-off?" >&2; exit 2; }
-python3 "$HERE/parse_activity.py" "$LOG" --workload "$LABEL" --line "$LINE" --note "$NOTE"
+python3 "$HERE/parse_activity.py" "$LOG" --workload "$LABEL" --line "$LINE" \
+    --note "$NOTE" --wall-ns "$WALL_NS"

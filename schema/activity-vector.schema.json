@@ -13,6 +13,25 @@
       "description": "must state DERIVED-from-QEMU; never 'measured silicon'"
     },
     "note": { "type": "string" },
+    "timing": {
+      "type": "object",
+      "description": "THE TIME BASE. The counts in `activity` are TOTALS; power is a RATE, and a total cannot be converted to a rate without a duration. Omitting this made the vector unable to predict power at all - only energy over a whole run. wall_ns is HOST wall time for the QEMU run, which is NOT guest time and NOT silicon time: it is the denominator for a host-side rate and a sanity check on run-to-run variance, nothing more. Use it to normalise two runs to equal duration; do NOT present anything derived from it as a silicon rate.",
+      "required": ["wall_ns", "wall_ns_provenance"],
+      "properties": {
+        "wall_ns": {
+          "type": "integer",
+          "description": "host wall-clock nanoseconds for the QEMU run, measured by the harness"
+        },
+        "wall_ns_provenance": {
+          "type": "string",
+          "description": "must say the clock is HOST wall time under TCG, not guest or silicon time"
+        },
+        "guest_insn_rate_est": {
+          "type": ["number", "null"],
+          "description": "total_insns / (wall_ns/1e9). A HOST throughput figure for the emulation, NOT the silicon's instruction rate - TCG is not cycle-accurate. Present only as an emulation-speed diagnostic."
+        }
+      }
+    },
     "activity": {
       "type": "object",
       "required": ["cores"],

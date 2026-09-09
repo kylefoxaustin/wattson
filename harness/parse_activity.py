@@ -89,6 +89,10 @@ def main():
     ap.add_argument("--line", type=int, default=DEFAULT_LINE_BYTES,
                     help="cache line bytes (libcache default 64)")
     ap.add_argument("--note", default="", help="free-text provenance note")
+    ap.add_argument("--wall-ns", type=int, default=None,
+                    help="HOST wall-clock ns for the QEMU run (from the harness). "
+                         "Without it the vector carries totals only and cannot "
+                         "speak about rates at all.")
     args = ap.parse_args()
 
     with open(args.logfile) as f:
@@ -99,8 +103,19 @@ def main():
         "workload": args.workload,
         "provenance": "DERIVED (QEMU TCG functional counters; NOT measured silicon)",
         "note": args.note,
-        "activity": v,
     }
+    if args.wall_ns is not None:
+        total = (v.get("cores") or {}).get("total_insns")
+        out["timing"] = {
+            "wall_ns": args.wall_ns,
+            "wall_ns_provenance":
+                "HOST wall-clock under TCG. NOT guest time, NOT silicon time. "
+                "Use to normalise runs to equal duration; never quote as a "
+                "silicon rate.",
+            "guest_insn_rate_est":
+                (total / (args.wall_ns / 1e9)) if (total and args.wall_ns) else None,
+        }
+    out["activity"] = v
     json.dump(out, sys.stdout, indent=2)
     print()
 
