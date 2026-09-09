@@ -184,3 +184,84 @@ wrong thing to optimise and only the held-out test exposed it.
 Different term counts per rail, deliberately: the core term earns its place on
 `vdd_arm` and fails the held-out test on `vdd_soc`. Using the same functional
 form for both would have looked tidier and been wrong.
+
+---
+
+## A second OPP — 900 MHz
+
+### ⚠️ FIRST, A CORRECTION TO EVERY EARLIER "FREQUENCY CONSTANT" CLAIM
+
+The earlier sweeps reported "frequency constant at 1800 MHz across every point"
+and treated that as a pinned condition. It was not. The board's governor is
+`ondemand`, and it simply sat at max under full load. Every earlier result is
+still valid AT 1800 MHz, but frequency was an **observed** constant, not a
+controlled one. This run pins it properly (`userspace` governor +
+`scaling_setspeed`), verified by reading `scaling_cur_freq` back.
+
+Available OPPs: **500 / 900 / 1404 / 1800 MHz**.
+
+### 🔴 THE 900 MHz FIT IS UNPHYSICAL, AND THE CAUSE IS MINE
+
+    vdd_arm @900 = 143.7 − 4.6246·aluM/s − 207.2·GB/s + 772.6·cores   R² = 0.9984
+
+R² of 0.998 with **negative coefficients on both ALU rate and bandwidth** — more
+work drawing less power. Nonsense.
+
+Cause: I cut the grid from 11 points to 7 to save time, dropping (1,1) and (3,3)
+— the asymmetric points whose whole purpose was breaking the collinearity
+between `active_cores` and the op rates. For ALU-only points `aluM/s` is
+*perfectly* proportional to core count, so with 7 points the fit distributes
+weight arbitrarily between them and still reports a near-perfect R².
+
+**A high R² on collinear regressors is not evidence of anything**, and this is
+the third time that has bitten this campaign. The 11-point design existed for
+exactly this reason and I reduced it anyway.
+
+### What the RAW measurements say — no fitting needed
+
+| point | arm@1800 | arm@900 | ratio | soc@1800 | soc@900 | ratio |
+|---|---:|---:|---:|---:|---:|---:|
+| (1,0) | 481.0 | 238.3 | 2.02 | 831.5 | 826.2 | 1.006 |
+| (2,0) | 656.3 | 307.0 | 2.14 | 832.9 | 828.0 | 1.006 |
+| (3,0) | 898.1 | 384.3 | 2.34 | 833.5 | 827.9 | 1.007 |
+| (0,1) | 638.3 | 323.0 | 1.98 | 991.6 | 942.7 | 1.052 |
+| (0,3) | 1657.5 | 749.2 | 2.21 | 1118.2 | 1029.6 | 1.086 |
+| (2,2) | 1641.0 | 716.7 | 2.29 | 1078.1 | 992.8 | 1.086 |
+| (1,3) | 1860.1 | 824.7 | 2.26 | 1125.6 | 1032.3 | 1.090 |
+
+    frequency ratio 2.00x
+    vdd_arm power ratio  median 2.21   (1.98–2.34)  → core-frequency dependent
+    vdd_soc power ratio  median 1.05   (1.006–1.090) → frequency-INDEPENDENT
+
+⭐ And `vdd_soc`'s residual frequency sensitivity is INDIRECT: the ratio is
+**1.006 on ALU-only points** (no traffic) and **1.086 on memory-heavy ones**. It
+has no direct clock term at all — it responds to bandwidth, and bandwidth is
+lower at 900 MHz because the cores issue slower.
+
+### ⭐ THE `vdd_soc` MODEL TRANSFERS ACROSS OPPs UNCHANGED
+
+Applying the 1800 MHz coefficients to the 900 MHz data, never fitted on it:
+
+| point | GB/s | measured | predicted | err |
+|---|---:|---:|---:|---:|
+| (1,0) | 0.000 | 826.2 | 851.6 | 3.1% |
+| (0,3) | 8.313 | 1029.6 | 1020.6 | 0.9% |
+| (2,2) | 5.566 | 992.8 | 965.8 | 2.7% |
+| (1,3) | 8.297 | 1032.3 | 1020.9 | 1.1% |
+
+**MAPE 2.5%, worst 3.7%** — better than its own out-of-sample error at 1800 MHz.
+`vdd_soc` is a pure bandwidth model and needs no frequency term.
+
+### Where that leaves the models
+
+    vdd_soc ≈ 851.0 + 0.0043·aluM/s + 20.4·GB/s
+      → valid at BOTH 900 and 1800 MHz as-is (2.5–7% across both)
+
+    vdd_arm ≈ 243.8 + 0.1266·aluM/s + 60.6·GB/s + 169.3·cores      @1800 MHz only
+      → needs an explicit frequency term; measured scaling 2.21x per 2x clock
+
+⚠️ Do NOT take 2.21x as a coefficient. It is the ratio of total rail power at
+matched activity points, which mixes the frequency effect with the fact that the
+same workload achieves different op rates at different clocks. Deriving a proper
+frequency term needs the full 11-point grid at each OPP — and the 500/1404 MHz
+points exist, so four OPPs are available when it is worth the time.
