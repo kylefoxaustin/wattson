@@ -77,3 +77,90 @@ workloads — a real test, but of ~13% of what the board draws.
 `AF_idle` is now MEASURED. `AF_max` needs the U=1.0 point, which requires the
 bare-metal workloads to run on this board — the U-Boot + `fastboot` path proven
 during the BSP flash is the mechanism.
+
+---
+
+## Steps 3 — P1, P2, P3 ON SILICON — **RUN, MIXED RESULT, ONE RETRACTION**
+
+Provenance: **MEASURED** on IMX95LPD5EVK-19, 2026-09-09, same census as the idle
+floor above (kernel `6.18.20-2.0.0-gb096ce610e95`, BCU ~147 Hz). Workloads are
+the bare-metal `bench-alu-silicon` / `bench-mem-silicon` builds, loaded from
+U-Boot with `fatload` and started with `go`.
+
+| rail | idle floor | bench-alu | bench-mem |
+|---|---:|---:|---:|
+| `vdd_arm` | 144.6 | **409.9** | **289.5** |
+| `vdd_soc` | 822.6 | 780.1 | 775.9 |
+| `vdd_ddr` | 118.9 | 119.9 | 119.3 |
+| `lpd5_vdd2` | 42.2 | 42.0 | 41.7 |
+
+### P1a — **PASS**
+`bench-alu` leaves GROUP_DRAM within **0.6%** of the idle floor (45.4 vs 45.7 mW),
+against a predicted ±10%. The compute workload provably does not touch DRAM.
+
+### P1b — **NOT TESTED. THE CHECKER PRINTED A FALSE PASS AND IT IS RETRACTED.**
+
+The evaluation script printed `ratio infx PASS`. It is wrong. The inputs were:
+
+    bench-alu GROUP_DRAM - idle = -0.29 mW
+    bench-mem GROUP_DRAM - idle = -0.57 mW
+
+**Both negative.** The DRAM rails during the memory workload sit BELOW the idle
+floor. The script divided by a near-zero denominator, got infinity, and compared
+it against ">= 10x". A gate that reports PASS on a negative numerator cannot
+fail, which is the exact defect class this campaign keeps finding in other
+people's tests and which I then wrote into my own.
+
+The real result is a NULL: **`bench-mem` produced no measurable DRAM rail
+activity.** P1b is untested, not passed.
+
+### P2 — **PASS**
+`vdd_arm` ratio alu/mem = **1.416**, inside the predicted 1.05–1.60. The
+compute-bound workload draws more core power than the memory-bound one, by
+roughly the predicted margin.
+
+### P3 — **FAIL**
+SoC-group ratio mem/alu = **0.907**, predicted 1.15–1.55 (bracketing AN14449's
+own 1.36x). `bench-mem` draws LESS total power than `bench-alu` — opposite in
+direction, not merely outside the band.
+
+### 🔴 P1b AND P3 SHARE ONE CAUSE, AND IT IS THE METHOD, NOT THE MODEL
+
+`go` on a flat binary requires `dcache off` in U-Boot, which drops the MMU and
+the data cache — otherwise the jump takes an instruction-fetch translation fault.
+**With caches disabled `bench-mem` cannot stream.** Every access becomes a slow,
+unpipelined transaction, so DRAM utilisation stays near zero and the core spends
+its time stalled rather than issuing. That predicts exactly what was measured:
+flat DRAM rails (P1b null) and lower total power than the compute workload
+(P3 fail).
+
+⚠️ **THEREFORE THESE TWO CELLS DO NOT INDICT THE PREDICTIONS.** They indict the
+delivery mechanism. A bare-metal `go` with caches off is not a valid vehicle for
+a memory-bandwidth workload, and any conclusion about memory power drawn from it
+would be a statement about the harness.
+
+`vdd_arm` (P2) is unaffected by this reasoning — the compute workload is
+register-only and does not depend on the cache — which is why P2 is reported as
+a result and P1b/P3 are not.
+
+### What has to change before P1b and P3 can be answered
+
+The workload must run WITH caches enabled. Options, in order of preference:
+1. run the workloads as a Linux userspace program on the booted board — caches
+   on, no `go`, no MMU games, and the same BCU window
+2. have the bare-metal image enable the MMU and caches itself before the
+   measured region
+3. accept that bare-metal `go` measures only cache-independent workloads
+
+Option 1 also fixes the wall-clock problem: a Linux process can be timed and
+repeated n=5 without a reboot between runs.
+
+### Scoreboard
+
+| prediction | result |
+|---|---|
+| P1a — DRAM flat for compute workload | **PASS** (0.6% of floor) |
+| P1b — DRAM discriminates >= 10x | **UNTESTED** — false PASS retracted; method invalid |
+| P2 — vdd_arm ratio 1.05–1.60 | **PASS** (1.416) |
+| P3 — SoC ratio 1.15–1.55 | **FAIL** (0.907) — attributed to caches-off, not to the model |
+| P4 — bridge linear in U | **BLOCKED** — WFI does not wake on silicon |
