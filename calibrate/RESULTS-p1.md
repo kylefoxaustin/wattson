@@ -164,3 +164,95 @@ repeated n=5 without a reboot between runs.
 | P2 — vdd_arm ratio 1.05–1.60 | **PASS** (1.416) |
 | P3 — SoC ratio 1.15–1.55 | **FAIL** (0.907) — attributed to caches-off, not to the model |
 | P4 — bridge linear in U | **BLOCKED** — WFI does not wake on silicon |
+
+---
+
+## Step 3b — RE-RUN WITH CACHES ON — **AND A RETRACTION OF THE P2 PASS ABOVE**
+
+The caches-off runs in Step 3 were invalidated by their own delivery mechanism.
+Re-run as Linux userspace processes on the booted board (`workloads/linux/bench.c`):
+caches on, no MMU games, TIME-BOUNDED so both runs are exactly 60 s and their
+mean-power ratio is directly comparable.
+
+Provenance: **MEASURED** on IMX95LPD5EVK-19, 2026-09-09, same census
+(kernel `6.18.20-2.0.0-gb096ce610e95`, BCU ~147 Hz). Both runs 60.0 s.
+`mem` streams a 512 MiB buffer, far larger than any cache: ~17.0e9 element-ops,
+roughly 4.5 GB/s of real DRAM traffic.
+
+| rail | idle floor | bench-alu | bench-mem |
+|---|---:|---:|---:|
+| `vdd_arm` | 144.6 | 474.0 | **759.8** |
+| `vdd_soc` | 822.6 | 817.8 | 1000.2 |
+| `vdd_ddr` | 118.9 | 120.8 | **539.1** |
+| `lpd5_vdd1` | 3.5 | 3.4 | **72.6** |
+| `lpd5_vdd2` | 42.2 | 41.8 | **328.4** |
+
+### 🔴 RETRACTION: THE P2 "PASS" IN STEP 3 IS WITHDRAWN
+
+Step 3 reported P2 as a PASS at 1.416 and argued it survived the caches-off
+problem because "`bench-alu` is register-only and cache-independent, which is why
+P2 is reported as a result while P1b/P3 are not."
+
+**That argument was wrong.** P2 is a RATIO, and its denominator is `bench-mem` —
+which was measured under exactly the method Step 3 had just declared invalid.
+Cache-independence of the numerator does not rescue a ratio whose denominator is
+contaminated. With the method fixed:
+
+| prediction | caches OFF (invalid) | caches ON (valid) | effect of the harness |
+|---|---:|---:|---|
+| P2 `vdd_arm` alu/mem | 1.416 → "PASS" | **0.624 → FAIL** | crosses the band |
+| P3 SoC ratio mem/alu | 0.907 → FAIL | **1.852 → FAIL** | inverts direction |
+
+**The broken harness did not add noise. It INVERTED both results** — turning a
+refutation into a false PASS on P2, and a too-high ratio into a too-low one on
+P3. Only P1a, which never involves `bench-mem` at all, survives from Step 3.
+
+### P1a — **PASS** (again, and this one was never in doubt)
+`bench-alu` leaves GROUP_DRAM within **1.0%** of the idle floor.
+
+### P1b — **DISCRIMINATES**, but the prediction was mis-formulated
+    GROUP_DRAM   idle 45.7    alu 45.2 (-0.46 mW, at noise)    mem 401.0 (+355.3 mW)
+
+The memory workload raises the DRAM rails ~8.8x above the floor; the compute
+workload does not move them at all. The substance of P1b — "the DRAM rails
+discriminate the two workloads" — is confirmed emphatically.
+
+⚠️ But the prediction asked for a ratio `(mem-idle)/(alu-idle) >= 10x` whose
+DENOMINATOR THE PREDICTION ITSELF EXPECTED TO BE ~ZERO (P1a says `alu` sits at
+the floor). A ratio against a predicted-zero denominator is not evaluable; that
+is a defect in how P1b was written, not in the result. The replacement check
+requires a positive denominator above a stated noise floor (0.5 mW) and reports
+a NULL otherwise — which is what caught the Step 3 false PASS.
+
+### P2 — **FAIL**, 0.624 (predicted 1.05–1.60)
+`bench-mem` draws MORE core power (759.8 mW) than `bench-alu` (474.0 mW).
+
+The pre-registration named this outcome in advance: *"Refuted if the ratio is
+< 1.0 — would mean stall cycles cost more than issue cycles, and the insn-count
+proxy is the wrong core activity metric."* That interpretation was fixed before
+the number existed, so it is a finding rather than a rationalisation:
+**instructions retired is the wrong proxy for `vdd_arm` activity on this part.**
+
+### P3 — **FAIL**, 1.852 (predicted 1.15–1.55, bracketing AN14449's 1.36x)
+Now overshooting rather than inverting. Per the pre-registration, a P3 miss is
+weaker evidence than P1/P2 because our workloads are not Stream and Dhrystone —
+`bench-mem` at ~4.5 GB/s may simply be more memory-intense than NXP's Stream
+configuration. It indicts the comparison, not necessarily the model.
+
+### Scoreboard after the method fix
+
+| prediction | result |
+|---|---|
+| P1a | **PASS** — 1.0% of floor |
+| P1b | **CONFIRMED IN SUBSTANCE** (+355 mW vs +0), ratio form not evaluable |
+| P2 | **FAIL** — 0.624; insn-count is the wrong `vdd_arm` proxy |
+| P3 | **FAIL** — 1.852; weaker evidence, different workloads |
+| P4 | **BLOCKED** — WFI does not wake on silicon |
+
+### What P2's failure means for the campaign
+
+The activity vector's core term is `total_insns`. P2 says that term does not
+track `vdd_arm`: a stalling memory workload burned 1.6x the core power of a
+workload retiring more instructions. Any AF built on instruction count alone
+will mis-rank these two workloads. The vector already carries `data_misses`
+and `dram_transactions_est`; the core model likely needs them, not just insns.
