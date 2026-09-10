@@ -13,3 +13,4 @@ xcheck/microbench
 # silicon-size ones are not, because their size is a per-board choice
 workloads/bench-*-silicon.bin
 workloads/linux/bench
+workloads/linux/probe
