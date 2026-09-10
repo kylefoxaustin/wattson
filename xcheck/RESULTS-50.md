@@ -7,29 +7,44 @@ taken on these applications**. This file reports what happened.
 
 | rail | MAPE | median | p90 | worst |
 |---|---:|---:|---:|---:|
-| `vdd_arm` | 7.7% | 7.0% | 16.3% | 20% |
-| `vdd_soc` | **4.5%** | 5.1% | 6.8% | 8% |
+| `vdd_arm` | 11.4% | 10.8% | 19.1% | 25.2% |
+| `vdd_soc` | **4.1%** | 5.0% | 5.9% | 7.1% |
+| **SUM** | **6.4%** | 6.5% | 10.2% | 14.8% |
+
+**4.5%** | 5.1% | 6.8% | 8% |
 | **SUM** | **4.9%** | 4.8% | 8.3% | 11% |
 
-**4.9% mean error on total power across 50 real applications, no application worse than 11%**, from coefficients
+**6.4% mean error on total power across 50 real applications, worst case 14.8%**, from coefficients
 fitted on an 11-point synthetic alu/mem grid containing none of them, with the
 activity supplied by QEMU.
 
 Published per-rail models report single-digit error on unseen workloads as the
 good outcome; McCullough (ATC 2011) and Walker (TCAD 2017) both warn that
-sub-3% on unseen workloads is a reason to distrust your validation set. 4.9% on
+sub-3% on unseen workloads is a reason to distrust your validation set. 6.4% on
 50 held-out real applications is inside that band and was not tuned toward.
 
 ## The three checks that were promised before the numbers existed
 
-### 1. Spread — the model is slightly under-responsive
+### 1. Spread — the model tracks the range, but sits low
 
-    predicted  1289 – 1771 mW
-    measured   1279 – 1808 mW
+    predicted  1289 – 1771 mW   (span 482)
+    measured   1295 – 1795 mW   (span 500)
 
-It compresses the range: the top end is close, the **bottom end is not reached**
-by about 10 mW. Stated as mW deliberately — a ratio of two spreads
-reads as "the model can be that far off", which is not what it means.
+The span is right to within 4%. What the model does instead is sit
+**systematically low by 6.4%** across the whole range — a bias, not a
+compression. Stated in mW deliberately: a ratio of two spreads reads as "the
+model can be that far off", which is not what it means.
+
+A constant bias is the benign failure mode. It is one intercept away from
+being corrected, and it does not distort the *ranking* of workloads by power,
+which is what a design decision usually turns on.
+
+⚠️ This supersedes an earlier reading of this same check, which reported the
+model as failing to reach the bottom of the range. That artifact came from the
+extraction bug in the correction below: the contaminated low-end measurements
+were pulled down by idle, which widened the measured range downward and made
+the model look under-responsive at the bottom. With the measurements corrected,
+the spread agrees and a clean bias is what remains.
 
 ## ⚠️ Correction — the original 52% outlier was a harness bug, not a model bug
 
@@ -56,37 +71,82 @@ is indistinguishable from one that ran cheaply.
 ## Multi-application — realistic edge mixes
 
 Single-application numbers do not tell you whether the model survives a product
-workload. These are concurrent mixes of applications drawn from the same 50,
-chosen to look like something an edge device actually runs.
+workload. These are concurrent mixes drawn from the same 50, chosen to look
+like something an edge device actually runs.
 
-| workload | applications running concurrently | cores | GB/s | pred mW | meas mW | err |
+**No silicon counter is used to predict these mixes.** Per-application activity
+comes from QEMU; each application's *solo* iteration rate (frozen in
+`RESULTS-50.csv`) converts it to a rate; the mix is the sum. That keeps it an
+end-to-end QEMU→silicon prediction rather than a curve fit on silicon activity.
+
+| workload | applications running concurrently | cores | pred mW | meas mW | err | err (PMU) |
 |---|---|---:|---:|---:|---:|---:|
-| AI + vision | pacman  +  sgm stereo | 2 | 0.37 | 1684 | 1747 | 3.6% |
-| AI + vision + DB + net | pacman  +  sgm  +  sqlite  +  httpp | 4 | 0.41 | 2205 | 2220 | 0.7% |
-| full edge stack, every core | pacman  +  sgm  +  sqlite  +  httpp  +  qoi  +  ray | 6 | 0.63 | 2680 | 2579 | 3.9% |
+| AI + vision | pacman  +  sgm stereo | 2 | 1605 | 1704 | 5.8% | 6.0% |
+| AI + vision + DB + net | pacman  +  sgm  +  sqlite  +  httpp | 4 | 2123 | 2189 | 3.0% | 3.1% |
+| full edge stack, every core | pacman  +  sgm  +  sqlite  +  httpp  +  qoi  +  ray | 6 | 2612 | 2561 | 2.0% | 0.7% |
 
-**Mean 2.7%, worst 3.9%** — better than the one-at-a-time result.
+**Mean 3.6%, worst 5.8%** across two to six concurrent applications.
 
-Controls over the same core counts, using synthetic and benchmark mixes:
+Controls over the same core counts:
 
-| workload | applications running concurrently | cores | GB/s | pred mW | meas mW | err |
+| workload | applications running concurrently | cores | pred mW | meas mW | err | err (PMU) |
 |---|---|---:|---:|---:|---:|---:|
-| compute + streaming | sha256  +  mem | 2 | 2.48 | 1878 | 2056 | 8.7% |
-| core scaling control | 4 x sha256 | 4 | 0.14 | 2307 | 2183 | 5.7% |
-| mixed benchmarks | sha256 + mem + lz4 + sqlite + lua + bzip2 | 6 | 3.20 | 2789 | 2748 | 1.5% |
+| compute-bound control | 4 x sha256 | 4 | 2304 | 2163 | 6.5% | 6.5% |
+| mixed benchmark control | sha256 + mem + lz4 + sqlite + lua + bzip2 | 6 | 3065 | 2878 | 6.5% | 1.4% |
 
-⭐ The realistic mixes run at **0.4–0.6 GB/s**; the synthetic ones at **2.5–3.2
-GB/s**. Real applications live in cache far more than streaming benchmarks do.
-The model was fitted on the streaming regime and holds in both — which is the
-result that matters, because the cache-resident regime is the one products are in.
+### Why the multi-application result beats the single-application one
+
+It is not that concurrency is easier to model. Summing several applications
+averages out per-application bias: the model's −6.4% single-app bias is a
+*distribution*, and adding two to six independent draws from it shrinks the
+spread of the total. The six-core cases are the most accurate for the same
+reason a mean of six samples beats a mean of one. This is expected, and it
+would be a mistake to read it as the model being better under load.
+
+### What the PMU column is for
+
+The last column re-runs the identical prediction using activity **measured on
+silicon** instead of QEMU. It separates two error sources that a single number
+hides:
+
+- On the edge mixes the two agree (5.8/6.0, 3.0/3.1, 2.0/0.7) — so the residual
+  error there is the **model's**, and QEMU's activity is not contributing to it.
+- They diverge on the streaming control: **6.5% QEMU vs 1.4% PMU**. QEMU's DRAM
+  proxy reports 5.08 GB/s where the silicon PMU reports 3.02. The coefficients
+  were fitted against PMU bandwidth, so an over-reported GB/s inflates the
+  prediction. The edge mixes run at 0.4–0.7 GB/s and are barely exposed to it.
+
+⭐ That divergence is the most useful number on the page: it says the remaining
+work is in QEMU's DRAM proxy at high bandwidth, not in the power model.
+
+⚠️ **Correction.** An earlier version of this section reported 2.7% mean / 3.9%
+worst on three mixes and claimed they beat the single-app result. Those numbers
+were invalid. The harness bounded only the *launch* of new iterations at 20 s
+and let the in-flight iteration finish, while `perf stat` wrapped the whole run,
+so long-iteration applications (pacman, sgm) overran by 4–13 s. The counters
+described a two-phase run — all applications, then a pacman+sgm tail — while the
+divisor assumed a flat 20 s, inflating activity rates by 1.22–1.66×. Because the
+model under-predicts, inflated activity *flattered* the result.
+
+It was re-measured, not re-derived: applications now run continuously from
+t=3 s to t=37 s with the 20 s counter window inside that span, so counters and
+power describe one homogeneous phase. `cores_eff` (cycles/1.8 GHz/window) comes
+out at 2.07, 4.06 and 5.98 for the 2-, 4- and 6-application mixes, which is the
+execution proof that every application was busy for the whole window.
+
+The re-run also caught a second fault: the old `sha256` controls were invoked as
+`app-sha256 200`, but the binary takes a *file* argument. Command lines now come
+verbatim from `manifest50.txt`.
 
 ⚠️ **Provenance:** rails MEASURED on IMX95LPD5EVK-19 via NXP BCU, A55 die
-40–41 °C under load; activity DERIVED from QEMU TCG plugins. Predictions computed
-from the frozen coefficients before each mix was measured.
+40–41 °C under load. `pred` DERIVED from QEMU TCG activity; `err (PMU)` DERIVED
+from silicon PMU activity and labelled as such wherever it appears. An earlier
+version of this section labelled the PMU-activity predictions as QEMU-derived,
+which was false.
 
 ## What holds up best
 
-`vdd_soc` at **4.5% MAPE with a worst case of 8%** — the tightest result of the
+`vdd_soc` at **4.1% MAPE with a worst case of 7.1%** — the tightest result of the
 campaign. It is bandwidth-driven, and bandwidth is what QEMU estimates well
 (`dram_bytes_proxy`, validated to 0.01% in steady state after accounting for
 write streaming).
@@ -94,7 +154,7 @@ write streaming).
 ## What this demonstrates
 
 QEMU predicted the per-rail power of 50 real applications on silicon it never
-ran on, blind, to 4.9%. The emulator supplied the activity; the coefficients came
+ran on, blind, to 6.4%. The emulator supplied the activity; the coefficients came
 from measured rails; no power measurement of these applications informed the
 prediction.
 

@@ -1,7 +1,6 @@
-case,kind,apps,cores,aluMps,GBps,pred_sum,meas_sum,err_sum
-e2_ai_vis,AI + vision,pacman  +  sgm stereo,2,1685,0.37,1684,1747,3.6
-e4_edge,AI + vision + DB + net,pacman  +  sgm  +  sqlite  +  httpp,4,3056,0.41,2205,2220,0.7
-e6_edge,"full edge stack, every core",pacman  +  sgm  +  sqlite  +  httpp  +  qoi  +  ray,6,3961,0.63,2680,2579,3.9
-n2_mix,compute + streaming,sha256  +  mem,2,1858,2.48,1878,2056,8.7
-n4_sha,core scaling control,4 x sha256,4,4003,0.14,2307,2183,5.7
-n6_mix,mixed benchmarks,sha256 + mem + lz4 + sqlite + lua + bzip2,6,3207,3.2,2789,2748,1.5
+case,kind,apps,cores,cores_eff,qemu_aluMps,qemu_GBps,pmu_aluMps,pmu_GBps,pred_qemu,pred_pmu,meas_sum,err_qemu,err_pmu,win_t0,win_t1
+e2_ai_vis,AI + vision,pacman  +  sgm stereo,2,2.07,1049,0.42,1067,0.22,1605,1602,1704,5.8,6.0,4,32
+e4_edge,AI + vision + DB + net,pacman  +  sgm  +  sqlite  +  httpp,4,4.06,2413,0.43,2431,0.24,2123,2120,2189,3.0,3.1,4,32
+e6_edge,"full edge stack, every core",pacman  +  sgm  +  sqlite  +  httpp  +  qoi  +  ray,6,5.98,3369,0.74,3340,0.43,2612,2580,2561,2.0,0.7,4,31
+n4_sha,compute-bound control,4 x sha256,4,4.06,3950,0.19,3968,0.04,2304,2305,2163,6.5,6.5,4,31
+n6_mix,mixed benchmark control,sha256 + mem + lz4 + sqlite + lua + bzip2,6,5.98,4147,5.08,3718,3.02,3065,2839,2878,6.5,1.4,4,31

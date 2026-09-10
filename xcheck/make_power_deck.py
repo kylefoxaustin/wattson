@@ -21,6 +21,7 @@ rows=list(csv.DictReader(open('RESULTS-50.csv')))
 mc=list(csv.DictReader(open('RESULTS-multicore.csv')))
 def f(r,k): return float(r[k])
 esum=[abs(f(r,'pred_sum')-f(r,'meas_sum'))/f(r,'meas_sum')*100 for r in rows]
+worst_app=max(rows,key=lambda r: abs(f(r,'pred_sum')-f(r,'meas_sum'))/f(r,'meas_sum'))['app']
 def p90(v): 
     w=sorted(v); return w[int(.9*len(w))]
 earm=[abs(f(r,'pred_arm')-f(r,'meas_arm'))/f(r,'meas_arm')*100 for r in rows]
@@ -37,7 +38,7 @@ def tb(sl,x,y,w,h,t,size,bold=False,color=INK,align=PP_ALIGN.LEFT,font="Calibri"
     r=p.add_run(); r.text=t; r.font.size=Pt(size); r.font.bold=bold; r.font.color.rgb=color; r.font.name=font
     return tf
 
-def slide(title, kicker=None):
+def slide(title, kicker=None, foot=None):
     s=prs.slides.add_slide(blank); PAGE[0]+=1
     band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,0,0,prs.slide_width,Inches(0.92))
     band.fill.solid(); band.fill.fore_color.rgb=INK; band.line.fill.background()
@@ -45,7 +46,7 @@ def slide(title, kicker=None):
     rule=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,0,Inches(0.92),prs.slide_width,Pt(3))
     rule.fill.solid(); rule.fill.fore_color.rgb=ACCENT; rule.line.fill.background()
     if kicker: tb(s,.6,1.06,12.2,.4,kicker,12,False,MUTED)
-    tb(s,.6,7.14,11.4,.3,FOOT,9.5,False,MUTED)
+    tb(s,.6,7.14,11.4,.3,foot or FOOT,9.5,False,MUTED)
     tb(s,12.5,7.14,.5,.3,str(PAGE[0]),9.5,False,MUTED,PP_ALIGN.RIGHT)
     return s
 
@@ -91,7 +92,7 @@ b.fill.solid(); b.fill.fore_color.rgb=GREEN; b.line.fill.background()
 tb(s,.9,1.62,11.6,.5,f"YES — {st.mean(esum):.1f}% on total power, blind, across 50 held-out applications.",21,True,WHITE)
 v=[("vdd_soc  (SoC + interconnect)",f"{st.mean(esoc):.1f}%",f"{p90(esoc):.1f}%",f"{max(esoc):.0f}%","bandwidth-driven; the tightest result"),
    ("vdd_arm  (A55 cores)",f"{st.mean(earm):.1f}%",f"{p90(earm):.1f}%",f"{max(earm):.0f}%","weakest rail; stall-heavy code is the limit"),
-   ("SUM  (what a power budget cares about)",f"{st.mean(esum):.1f}%",f"{p90(esum):.1f}%",f"{max(esum):.0f}%","no application worse than 11%")]
+   ("SUM  (what a power budget cares about)",f"{st.mean(esum):.1f}%",f"{p90(esum):.1f}%",f"{max(esum):.1f}%",f"worst case {max(esum):.1f}% ({worst_app})")]
 table(s,.6,2.6,12.1,(4.6,1.5,1.5,1.5,3.0),("rail","MAPE","p90","worst","note"),v,fsz=12,rh=0.46,bold_cols=(0,1))
 tb(s,.6,4.35,12.1,.34,"p90 is reported beside the mean deliberately: a MAPE alone hides a tail, and the tail is where a power budget gets hurt.",11,False,MUTED)
 tb(s,.6,4.75,12.1,.5,"Published per-rail models report single-digit error on unseen workloads as the GOOD outcome. "
@@ -109,7 +110,7 @@ steps=[("1","Get the instrument","IMX95LPD5EVK-19 — the only i.MX 95 board wit
  ("5","Add the missing term","598 Mops/s on 2 cores = 656 mW; 599 on 1 core = 465 mW. Active cores matter on their own."),
  ("6","Validate QEMU's counters","Same static binary under perf and under QEMU: instructions 0.1%, misses 0.01% in steady state."),
  ("7","Freeze predictions for 50 apps","Committed to git BEFORE any power measurement of those apps."),
- ("8","Measure and compare","5.3% mean error on total power.")]
+ ("8","Measure and compare",f"{st.mean(esum):.1f}% mean error on total power.")]
 table(s,.6,1.6,12.1,(0.5,3.4,8.2),("#","step","what came out"),steps,fsz=10.5,rh=0.55,bold_cols=(1,))
 
 # ── 4 · the models ─────────────────────────────────────────────────────────
@@ -195,40 +196,45 @@ tb(s,.9,6.46,11.5,.4,f"{n_g} of 50 within 8%   ·   {n_a} between 8 and 12%   ·
    f"\u2014   mW predicted vs mW measured, on silicon the model never trained on.",13,True,GREEN)
 
 # ── 8 · multi-core, realistic edge mix ─────────────────────────────────────
-s=slide("A realistic edge workload — all six cores busy","Perception, inference, storage, networking, imaging, rendering. Running at the same time, as a product would.")
+MFOOT=("wattson power \u00b7 rails MEASURED on IMX95LPD5EVK-19 (NXP BCU) \u00b7 A55 die 40\u201341 \u00b0C \u00b7 "
+       "activity DERIVED from QEMU TCG; PMU column MEASURED on silicon \u00b7 2026-09-10")
+s=slide("A realistic edge workload \u2014 all six cores busy",
+        "Perception, inference, storage, networking, imaging, rendering, running at the same time. "
+        "Predicted from QEMU alone: no silicon counter is used for these mixes.",foot=MFOOT)
 edge=[r for r in mc if r['case'].startswith('e')]
 ctrl=[r for r in mc if not r['case'].startswith('e')]
-ee=[float(r['err_sum']) for r in edge]
-band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(.6),Inches(1.55),Inches(12.1),Inches(.68))
+eq=[float(r['err_qemu']) for r in edge]
+band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(.6),Inches(1.72),Inches(12.1),Inches(.6))
 band.fill.solid(); band.fill.fore_color.rgb=GREEN; band.line.fill.background()
-tb(s,.9,1.65,11.6,.44,f"{st.mean(ee):.1f}% mean error, {max(ee):.1f}% worst \u2014 better than one application at a time.",18,True,WHITE)
-d=[(r['kind'],r['apps'],r['cores'],f"{float(r['pred_sum']):.0f}",f"{float(r['meas_sum']):.0f}",
-    f"{float(r['err_sum']):.1f}%") for r in edge]
+tb(s,.9,1.80,11.6,.44,f"{st.mean(eq):.1f}% mean error, {max(eq):.1f}% worst, across two to six concurrent applications.",18,True,WHITE)
+def mk(rows):
+    return [(r['kind'],r['apps'],r['cores'],f"{float(r['pred_qemu']):.0f}",
+             f"{float(r['meas_sum']):.0f}",f"{float(r['err_qemu']):.1f}%",f"{float(r['err_pmu']):.1f}%") for r in rows]
+d=mk(edge)
 def cf1(ri,c):
-    if c==5:
-        v=float(d[ri][5].rstrip('%')); return GREEN if v<=8 else (AMBER if v<=12 else RED)
+    if c in (5,6):
+        v=float(d[ri][c].rstrip('%')); return GREEN if v<=8 else (AMBER if v<=12 else RED)
     return None
-table(s,.6,2.45,12.1,(2.9,5.0,.85,1.15,1.15,1.05),
-      ("what it is","applications running concurrently","cores","pred mW","meas mW","err"),
-      d,fsz=11.5,rh=0.46,bold_cols=(0,5),color_fn=cf1)
+COLS=(2.75,4.55,.72,1.05,1.05,1.0,1.0)
+HDR=("what it is","applications running concurrently","cores","pred mW","meas mW","err","err (PMU)")
+table(s,.6,2.48,12.1,COLS,HDR,d,fsz=11.5,rh=0.46,bold_cols=(0,5),color_fn=cf1)
 tb(s,.6,4.34,12.1,.36,"pacman = genetic-AI trainer  \u00b7  sgm = stereo-vision disparity on real imagery  \u00b7  "
    "sqlite = in-memory OLTP  \u00b7  httpp = HTTP parsing  \u00b7  qoi = image codec  \u00b7  ray = ray tracer",10.5,False,MUTED)
 tb(s,.6,4.80,12.1,.32,"Controls \u2014 synthetic and benchmark mixes over the same core counts:",11,True,INK)
-d2=[(r['kind'],r['apps'],r['cores'],f"{float(r['pred_sum']):.0f}",f"{float(r['meas_sum']):.0f}",
-     f"{float(r['err_sum']):.1f}%") for r in ctrl]
+d2=mk(ctrl)
 def cf2(ri,c):
-    if c==5:
-        v=float(d2[ri][5].rstrip('%')); return GREEN if v<=8 else (AMBER if v<=12 else RED)
+    if c in (5,6):
+        v=float(d2[ri][c].rstrip('%')); return GREEN if v<=8 else (AMBER if v<=12 else RED)
     return None
-table(s,.6,5.14,12.1,(2.9,5.0,.85,1.15,1.15,1.05),
-      ("what it is","applications running concurrently","cores","pred mW","meas mW","err"),
-      d2,fsz=10.5,rh=0.38,bold_cols=(0,5),color_fn=cf2)
-tb(s,.6,6.70,12.1,.34,"The realistic mixes run at 0.4\u20130.6 GB/s; the synthetic ones at 2.5\u20133.2 GB/s. "
-   "Real applications live in cache far more than streaming benchmarks do \u2014 and the model covers both.",10.5,False,ACCENT)
+table(s,.6,5.14,12.1,COLS,HDR,d2,fsz=10.5,rh=0.38,bold_cols=(0,5),color_fn=cf2)
+tb(s,.6,6.36,12.1,.66,"The last column re-runs each prediction using activity measured on silicon instead of QEMU, "
+   "which separates the model from the emulator. They agree on the edge mixes \u2014 so the error there is the "
+   "model's, not QEMU's. They diverge only on the streaming control (6.5% vs 1.4%), where QEMU's DRAM proxy "
+   "over-reports bandwidth. Edge workloads run at 0.4\u20130.7 GB/s and are barely exposed to it.",10.5,False,ACCENT)
 
 # ── 8 · what this licenses ─────────────────────────────────────────────────
 s=slide("What this licenses, and what it does not","The trust statement, quantity by quantity.")
-lic=[("predict total power of an unseen app","YES","4.9% mean, 11% worst, 50 held-out applications"),
+lic=[("predict total power of an unseen app","YES",f"{st.mean(esum):.1f}% mean, {max(esum):.1f}% worst, 50 held-out applications"),
      ("predict vdd_soc","YES","4.5% mean, 8% worst — the strongest single result"),
      ("predict vdd_arm for compute-bound code","YES","7.1% median, 16.3% p90"),
      ("predict vdd_arm for stall-heavy code","NO","up to 20% over — the insns/3 proxy overstates it"),
