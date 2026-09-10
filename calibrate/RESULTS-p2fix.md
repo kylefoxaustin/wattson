@@ -337,3 +337,61 @@ patterns (`memset`, `memcpy`, page zeroing, buffer init).
 | instructions retired | **0.1%** (compute), 3.6% (memory) |
 | cache misses, steady state | **0.01%** after accounting for write streaming |
 | cache misses, including buffer init | +25%, entirely the un-modelled write streaming |
+
+---
+
+## Closing the frequency question — PER-OPP COEFFICIENT SETS, not one scaling law
+
+The full 11-point grid was re-run at 900 MHz (the earlier 7-point attempt was
+under-determined and produced negative coefficients). Both OPPs now have the
+same design.
+
+    vdd_arm @1800 MHz = 243.8 + 0.1266·aluM/s + 60.62·GB/s + 169.3·cores   R² = 0.9924
+    vdd_arm @ 900 MHz = 130.2 + 0.3826·aluM/s + 63.05·GB/s +  29.6·cores   R² = 0.9973
+
+**Both fits have all-positive, physically interpretable coefficients.**
+
+### Why there is no single frequency law here
+
+The coefficient ratios between OPPs are incoherent:
+
+| term | @1800 | @900 | ratio |
+|---|---:|---:|---:|
+| intercept | 243.8 | 130.2 | 1.87 |
+| alu | 0.1266 | 0.3826 | **0.33** |
+| bandwidth | 60.62 | 63.05 | 0.96 |
+| cores | 169.3 | 29.6 | **5.72** |
+
+`alu` falls and `cores` rises by wildly different factors. That is not physics —
+it is the ALU/cores collinearity: on ALU-only points `aluM/s` is proportional to
+core count, so the two fits split the same variance differently. Bandwidth, which
+is *not* collinear with either, scales sensibly (0.96 — a memory-side quantity,
+correctly almost frequency-independent).
+
+### The pooled fit is MORE ACCURATE AND LESS USABLE
+
+Pooling all 22 points with frequency and a `cores×freq` interaction:
+
+    R² = 0.9950, MAPE 4.4%  —  but  alu = −0.0135  and  cores = −63.35
+
+Both negative. The interaction term absorbs them, so the *combination* is
+physical while the individual terms are not. ⚠️ **A hardware team plugging
+activity factors into a spreadsheet cannot use a negative per-core cost**, and
+Walker et al. name exactly this — collinearity producing "wild or negative
+activity factors a hardware team will rightly reject even when total-power
+predictions look fine."
+
+**So the deliverable is per-OPP coefficient sets, which is also what the
+published PMC models do** (Walker's is per-(V,f)). Two accurate, interpretable
+models beat one accurate uninterpretable one.
+
+### What it would take to get a real frequency law
+
+Break the ALU/cores collinearity: run N cores at a *fraction* of full rate, so
+op-rate and core-count vary independently. That needs throttling, which
+introduces an idle-fraction confound that must then be measured and modelled.
+The board also offers 500 and 1404 MHz, so four OPPs are available — but more
+frequencies do not fix collinearity, only a better design does.
+
+⚠️ Until then: **do not interpolate between the two coefficient sets.** Use the
+set for the OPP you are at.
