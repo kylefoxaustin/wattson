@@ -401,6 +401,63 @@ replace_text(4, "Part 1 — Where QEMU does not see the same work",
 replace_text(4, "Memory bandwidth. QEMU's DRAM proxy against the A55's l3d_cache_refill counter.",
              "Memory bandwidth. QEMU's DRAM read traffic against the A55's l3d_cache_refill counter.")
 
+# 12 · the comparison that actually addresses trust: not "is QEMU right" but
+#      "is it better than a flat activity assumption, which is what is used
+#      today". The constant is fitted IN-SAMPLE, which is generous to the
+#      status quo twice over -- pre-silicon you cannot fit it at all, because
+#      the constant IS the answer you are trying to compute.
+_pts = []
+for _r in csv.DictReader(open('RESULTS-50.csv')):
+    _pts.append((float(_r['pred_sum']), float(_r['meas_sum']), _r['app'], 'single app'))
+for _r in csv.DictReader(open('RESULTS-multicore.csv')):
+    _pts.append((float(_r['pred_qemu']), float(_r['meas_sum']), _r['kind'], 'concurrent'))
+for _r in csv.DictReader(open('RESULTS-bandwidth.csv')):
+    _pts.append((float(_r['pred_mW']), float(_r['meas_mW']), _r['workload'].split(' —')[0], 'bandwidth'))
+_m = [x[1] for x in _pts]
+_q = [abs(a - b) / b * 100 for a, b, _, _ in _pts]
+_cm, _cb = min((sum(abs(c - x) / x * 100 for x in _m) / len(_m), c)
+               for c in [x * 0.5 for x in range(2000, 6000)])
+_ce = [abs(_cb - x) / x * 100 for x in _m]
+_s = new_slide("Against the assumption used today",
+               "Nobody has to trust an emulator in absolute terms. The question is whether it beats a flat "
+               "activity factor — which is what a power estimate is multiplied by now.")
+_bn = _s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(.6), Inches(1.72), Inches(12.1), Inches(.60))
+_bn.fill.solid(); _bn.fill.fore_color.rgb = GREEN; _bn.line.fill.background()
+tb(_s, .9, 1.80, 11.6, .46,
+   f"Worst case {max(_ce):.0f}% against {max(_q):.0f}%, over {len(_pts)} measured operating points.",
+   18, True, WHITE)
+_d = [("a flat activity assumption", f"{_cm:.1f}%", f"{max(_ce):.1f}%",
+       "one number for every workload — it cannot tell two applications apart"),
+      ("QEMU-derived activity factors", f"{st.mean(_q):.1f}%", f"{max(_q):.1f}%",
+       "a number per application, from the binary that will actually run")]
+def _cf(ri, c):
+    if c in (1, 2): return RED if ri == 0 else GREEN
+    return None
+table(_s, .6, 2.50, 12.1, (3.5, 1.3, 1.4, 5.9),
+      ("method", "mean", "worst", "what it can distinguish"), _d, fsz=12, rh=.50,
+      bold_cols=(0, 1, 2), color_fn=_cf)
+tb(_s, .6, 4.14, 12.1, .32, "Where the flat assumption breaks — and it is exactly where power decisions get made:",
+   11.5, True, INK)
+_w = sorted(zip(_ce, _q, [x[2] for x in _pts], [x[3] for x in _pts]), reverse=True)[:5]
+_d2 = [(n, k, f"{c:.0f}%", f"{qq:.1f}%") for c, qq, n, k in _w]
+def _cf2(ri, c):
+    if c == 2: return RED
+    if c == 3: return GREEN
+    return None
+table(_s, .6, 4.52, 7.9, (3.4, 1.6, 1.45, 1.45),
+      ("workload", "kind", "flat", "QEMU"), _d2, fsz=11, rh=.36, bold_cols=(0, 2, 3), color_fn=_cf2)
+_bx = _s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(8.72), Inches(4.52), Inches(3.98), Inches(2.16))
+_bx.fill.solid(); _bx.fill.fore_color.rgb = RGBColor(0xFD, 0xF6, 0xEC); _bx.line.color.rgb = AMBER
+tb(_s, 8.96, 4.64, 3.5, 1.95,
+   f"Stated against ourselves:\n\n"
+   f"The constant ({_cb:.0f} mW) was fitted on the very measurements it predicts. Pre-silicon you "
+   f"could not pick it — that number IS the answer being computed.\n\n"
+   f"And on the 50 single-core applications alone, spanning only 1.4x, the constant wins on the mean. "
+   f"Per-application activity earns its place on the tails, not the average.", 10.5, False, INK)
+tb(_s, .6, 6.78, 12.1, .34,
+   "The useful claim is not that the emulator is right — it is that a traceable number beats one nobody can tie to a workload.",
+   11.5, True, ACCENT)
+
 # both new slides land before the closing slide
 reorder([
     "From activity counts",
@@ -417,6 +474,7 @@ reorder([
     "What this licenses",
     "Where the number actually",
     "What this actually replaces",
+    "Against the assumption used today",
     "What this actually means",
 ])
 renumber()

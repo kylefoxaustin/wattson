@@ -281,6 +281,39 @@ right. The estimates themselves remain unvalidated by anything here.
 silicon *activity counter* was used. It never means watts came out of an
 emulator.
 
+## Against the alternative — is this better than a flat activity factor?
+
+The trust question is not whether an emulator is right in absolute terms. It is
+whether a QEMU-derived activity factor beats what a power estimate is
+multiplied by today: a flat assumption, one number for every workload.
+
+Over all **60 measured operating points** (1–6 cores, 0–11 GB/s):
+
+| method | mean | worst |
+|---|---:|---:|
+| flat activity assumption | 7.4% | **49.4%** |
+| QEMU-derived activity factors | **6.3%** | **14.8%** |
+
+⚠️ **Two concessions to the status quo, both deliberate.** The constant
+(1457 mW) was chosen *in-sample* — fitted on the very measurements it is then
+scored against. And pre-silicon it could not be chosen at all, because that
+constant **is** the answer the exercise is trying to produce. The comparison is
+therefore generous to the flat assumption and it still loses on the tail.
+
+⭐ **Where per-application activity does NOT help.** On the 50 single-core
+applications alone, spanning only 1.4x, the constant wins on the mean
+(3.9% vs 6.4%).
+A constant is a good predictor of a quantity that barely varies. Per-application
+activity earns its place on the **tails** — and the tails are where power
+decisions get made.
+
+The flat assumption's worst cases are all concurrency and bandwidth: the mixed
+six-core benchmark (49% vs 6.5%), the six-workload edge mix (43% vs 2.0%), the
+write-heavy stream (25% vs 12%). Those are exactly the cases that size a
+thermal solution.
+
+Data in `RESULTS-vs-flat.csv`.
+
 ## What this demonstrates
 
 QEMU predicted the per-rail power of 50 real applications on silicon it never
