@@ -1,0 +1,7 @@
+case,kind,apps,cores,aluMps,GBps,pred_sum,meas_sum,err_sum
+e2_ai_vis,AI + vision,pacman  +  sgm stereo,2,1685,0.37,1684,1747,3.6
+e4_edge,AI + vision + DB + net,pacman  +  sgm  +  sqlite  +  httpp,4,3056,0.41,2205,2220,0.7
+e6_edge,"full edge stack, every core",pacman  +  sgm  +  sqlite  +  httpp  +  qoi  +  ray,6,3961,0.63,2680,2579,3.9
+n2_mix,compute + streaming,sha256  +  mem,2,1858,2.48,1878,2056,8.7
+n4_sha,core scaling control,4 x sha256,4,4003,0.14,2307,2183,5.7
+n6_mix,mixed benchmarks,sha256 + mem + lz4 + sqlite + lua + bzip2,6,3207,3.2,2789,2748,1.5
