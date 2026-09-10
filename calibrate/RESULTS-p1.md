@@ -309,3 +309,55 @@ ownership model for PPIs, so it will accept any group assignment. **A guest
 sequence validated only under QEMU can be wrong about interrupt ownership on
 silicon** — which is exactly the class of thing this emulator exists to catch,
 and did not.
+
+---
+
+## P3 — RE-RUN WITH THE REAL BENCHMARKS — **PASS**
+
+The earlier P3 result (0.907 caches-off, then 1.852 caches-on) used
+`bench-alu`/`bench-mem` as stand-ins for Dhrystone and Stream. The
+pre-registration flagged that in advance: *"a miss here is weaker evidence than
+a miss on P1 or P2 — it indicts the comparison, not necessarily the model."*
+
+Re-run with the actual benchmarks: **Dhrystone 2.1** (cross-compiled, all
+self-checks passing) and the board's own **`/usr/bin/stream`**. Both looped for a
+sustained ~32 s window under BCU. Provenance **MEASURED**, IMX95LPD5EVK-19,
+kernel `6.18.20-2.0.0-gb096ce610e95`.
+
+| rail | dhrystone | stream | ratio |
+|---|---:|---:|---:|
+| `vdd_arm` | 553.5 | 562.1 | **1.02** |
+| `vdd_soc` | 829.1 | 965.1 | 1.16 |
+| `vdd_ddr` | 122.6 | 506.1 | 4.13 |
+| `lpd5_vdd1` | 3.5 | 58.2 | 16.51 |
+| `lpd5_vdd2` | 42.5 | 248.6 | 5.85 |
+| **TOTAL** | **1551.3** | **2340.0** | **1.508** |
+
+**P3 PASS** — 1.508, inside the predicted 1.15–1.55, and 11% from AN14449's
+3825.18/2810.06 = 1.36x.
+
+⚠️ Two honesty notes on this PASS:
+
+1. **It sits at 1.508 against a 1.55 ceiling** — near the edge of the band, not
+   comfortably central. A tighter band would have failed it.
+2. **AN14449's 1.36x is SOURCED** (NXP's document, their board, their build);
+   ours is MEASURED. Under Law 1 those are not peers, so this is
+   **corroboration, not validation**. The prediction was deliberately written as
+   a band *bracketing* 1.36 rather than a comparison against it, which is what
+   makes the test legitimate rather than a mixed-tier comparison.
+
+⭐ **The per-rail split independently confirms P2.** The DRAM rails do all the
+work (4.1x to 16.5x) while `vdd_arm` is **flat at 1.02** — Dhrystone and Stream
+draw the *same* core power despite completely different instruction profiles.
+If instruction count drove that rail, it could not be flat here. That is P2's
+finding arriving from a second, independent direction.
+
+## Final scoreboard
+
+| prediction | result |
+|---|---|
+| P1a — DRAM flat for a compute workload | **PASS** (1.0% of floor) |
+| P1b — DRAM discriminates | **CONFIRMED** (+355 mW vs +0); ratio form mis-worded |
+| P2 — `vdd_arm` ratio 1.05–1.60 | **FAIL** (0.624) — root-caused: instructions explain 3% of core power |
+| P3 — SoC ratio 1.15–1.55 | **PASS** (1.508) with the real benchmarks |
+| P4 — bridge linear in U | **UNBLOCKED** — ATF owns PPI 26 as Secure Group 0 |
