@@ -25,6 +25,38 @@ def header(ws, hdr):
 
 wb = Workbook(); wb.remove(wb.active)
 
+# ── activity factors (Part 1) ─────────────────────────────────────────────
+act = list(csv.DictReader(open('RESULTS-activity.csv')))
+ws = wb.create_sheet('activity factors')
+header(ws, ['app', 'QEMU insns', 'silicon insns', 'insn err %',
+            'QEMU GB/s', 'silicon GB/s', 'bandwidth err %', 'elapsed s'])
+for r in act:
+    be = float(r['bw_err']) if r['bw_err'] else None
+    ws.append([r['app'], float(r['qemu_insns']), float(r['silicon_insns']), float(r['insn_err']),
+               float(r['qemu_GBps']), float(r['silicon_GBps']), be, float(r['elapsed_s'])])
+    c = ws.cell(ws.max_row, 4); v = abs(float(r['insn_err']))
+    c.fill = G if v <= 2 else (A if v <= 8 else R); c.number_format = '0.00'
+    if be is not None and float(r['silicon_GBps']) >= 0.5:
+        c2 = ws.cell(ws.max_row, 7)
+        c2.fill = R if abs(be) > 25 else A; c2.number_format = '0.0'
+    for col in (2, 3): ws.cell(ws.max_row, col).number_format = '#,##0'
+    for col in (5, 6): ws.cell(ws.max_row, col).number_format = '0.000'
+    ws.cell(ws.max_row, 1).font = Font(bold=True)
+ie = [abs(float(r['insn_err'])) for r in act]
+ws.append([])
+ws.append([f'instructions: MAPE {st.mean(ie):.2f}%, median {st.median(ie):.2f}%, '
+           f'{sum(1 for x in ie if x <= 2)} of {len(ie)} within 2%'])
+ws.cell(ws.max_row, 1).font = Font(bold=True, color='1F3864')
+ws.append(['bandwidth error is only meaningful for the 3 applications above 0.5 GB/s; '
+           'below that the absolute traffic is too small for the ratio to mean anything'])
+ws.cell(ws.max_row, 1).font = Font(italic=True, size=9, color='808080')
+ws.append(['QEMU counts DERIVED from TCG plugins (linux-user); silicon counts MEASURED via ARM PMU '
+           '(i.MX95, A55 core 0, pinned 1.8 GHz)'])
+ws.cell(ws.max_row, 1).font = Font(italic=True, size=9, color='808080')
+for col, w in zip('ABCDEFGH', (14, 15, 15, 11, 11, 12, 15, 10)):
+    ws.column_dimensions[col].width = w
+ws.freeze_panes = 'B2'
+
 # ── single-app ────────────────────────────────────────────────────────────
 rows = list(csv.DictReader(open('RESULTS-50.csv')))
 ws = wb.create_sheet('50 apps (single)')
@@ -89,6 +121,9 @@ for rail, key in (('vdd_arm', 'err_arm'), ('vdd_soc', 'err_soc'), ('SUM', 'err_s
     m, md, p9, wo, n = agg([float(r[key]) for r in rows])
     ws.append(['50 apps (single)', rail, round(m, 1), round(md, 1), round(p9, 1), round(wo, 1), n])
     shade(ws.cell(ws.max_row, 3), m)
+ws.append(['activity: instructions', 'QEMU vs PMU', round(st.mean(ie),2), round(st.median(ie),2),
+           round(sorted(ie)[int(.9*len(ie))],2), round(max(ie),2), len(ie)])
+shade(ws.cell(ws.max_row, 3), st.mean(ie))
 m, md, p9, wo, n = agg(eq)
 ws.append(['edge mixes (concurrent)', 'SUM', round(m, 1), round(md, 1), round(p9, 1), round(wo, 1), n])
 shade(ws.cell(ws.max_row, 3), m)

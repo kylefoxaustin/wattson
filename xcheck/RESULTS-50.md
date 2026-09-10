@@ -23,6 +23,45 @@ good outcome; McCullough (ATC 2011) and Walker (TCAD 2017) both warn that
 sub-3% on unseen workloads is a reason to distrust your validation set. 6.4% on
 50 held-out real applications is inside that band and was not tuned toward.
 
+## Part 1 — Does QEMU reproduce the activity itself?
+
+Before any power claim, the prior question: does the emulator see the same work
+the silicon does? Same binary, same input, QEMU's TCG counts against the A55's
+own PMU. All 50 applications, in `RESULTS-activity.csv`.
+
+**Instructions — yes.**
+
+| metric | value |
+|---|---:|
+| mean absolute error | **1.75%** |
+| median | 0.65% |
+| within 1% | 28 of 50 |
+| within 2% | 41 of 50 |
+| worst | 15.4% (`bb-cksum`) |
+
+**Bandwidth — no.** QEMU's DRAM proxy over-reports against `l3d_cache_refill`:
+
+| app | QEMU GB/s | silicon GB/s | error |
+|---|---:|---:|---:|
+| `mem-w` | 4.66 | 2.62 | +78% |
+| `mem` | 4.93 | 2.53 | +95% |
+| `mm-big` | 1.49 | 0.60 | +149% |
+
+Those are the only 3 of 50 applications above 0.5 GB/s. The cause is
+**write streaming**: the A55 skips read-for-ownership on a full cache-line
+write, so the line is never fetched. QEMU's cache model allocates it anyway and
+counts a transaction the silicon never issues. Single mechanism, not noise.
+
+⭐ **Why the power result survives it.** 47 of 50 applications run below
+0.5 GB/s, where the whole bandwidth term is worth under 27 mW against a
+~1400 mW budget. The error is real and it is in the place where it does least
+damage for application workloads. It is also the first thing to fix before any
+of this is pointed at streaming or DMA-heavy code — and it is the one piece of
+upstream QEMU work this campaign produced.
+
+⚠️ **Provenance:** QEMU counts DERIVED from TCG plugins (linux-user); silicon
+counts MEASURED via ARM PMU on i.MX95, A55 core 0, pinned at 1.8 GHz.
+
 ## The three checks that were promised before the numbers existed
 
 ### 1. Spread — the model tracks the range, but sits low

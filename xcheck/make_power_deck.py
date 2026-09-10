@@ -19,6 +19,12 @@ FOOT="wattson power · rails MEASURED on IMX95LPD5EVK-19 (NXP BCU) · A55 die 40
 
 rows=list(csv.DictReader(open('RESULTS-50.csv')))
 mc=list(csv.DictReader(open('RESULTS-multicore.csv')))
+ACT=[dict(app=r['app'],qi=float(r['qemu_insns']),si=float(r['silicon_insns']),
+          ierr=float(r['insn_err']),qb=float(r['qemu_GBps']),sb=float(r['silicon_GBps']),
+          berr=float(r['bw_err']) if r['bw_err'] else 0.0)
+     for r in csv.DictReader(open('RESULTS-activity.csv'))]
+IE=[abs(r['ierr']) for r in ACT]
+HIBW=sorted([r for r in ACT if r['sb']>=0.5],key=lambda r:-r['sb'])
 def f(r,k): return float(r[k])
 esum=[abs(f(r,'pred_sum')-f(r,'meas_sum'))/f(r,'meas_sum')*100 for r in rows]
 worst_app=max(rows,key=lambda r: abs(f(r,'pred_sum')-f(r,'meas_sum'))/f(r,'meas_sum'))['app']
@@ -42,7 +48,8 @@ def slide(title, kicker=None, foot=None):
     s=prs.slides.add_slide(blank); PAGE[0]+=1
     band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,0,0,prs.slide_width,Inches(0.92))
     band.fill.solid(); band.fill.fore_color.rgb=INK; band.line.fill.background()
-    tb(s,.6,.13,11.6,.6,title,26,True,WHITE)
+    _ts=26 if len(title)<=44 else (22 if len(title)<=58 else 19)
+    tb(s,.6,.13,12.2,.66,title,_ts,True,WHITE)
     rule=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,0,Inches(0.92),prs.slide_width,Pt(3))
     rule.fill.solid(); rule.fill.fore_color.rgb=ACCENT; rule.line.fill.background()
     if kicker: tb(s,.6,1.06,12.2,.4,kicker,12,False,MUTED)
@@ -86,20 +93,27 @@ tb(s,1.1,4.52,11.2,.6,"Predictions were committed to git before a single power s
 tb(s,.8,5.6,11.8,.35,"Kyle Fox · IMX95LPD5EVK-19 + NXP BCU per-rail shunts · qemu-aarch64 TCG plugins · 2026-09-10",11,False,MUTED)
 
 # ── 2 · the verdict ────────────────────────────────────────────────────────
-s=slide("Can QEMU predict silicon power?","The question this campaign exists to answer.")
-b=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(.6),Inches(1.5),Inches(12.1),Inches(.8))
-b.fill.solid(); b.fill.fore_color.rgb=GREEN; b.line.fill.background()
-tb(s,.9,1.62,11.6,.5,f"YES — {st.mean(esum):.1f}% on total power, blind, across 50 held-out applications.",21,True,WHITE)
-v=[("vdd_soc  (SoC + interconnect)",f"{st.mean(esoc):.1f}%",f"{p90(esoc):.1f}%",f"{max(esoc):.0f}%","bandwidth-driven; the tightest result"),
-   ("vdd_arm  (A55 cores)",f"{st.mean(earm):.1f}%",f"{p90(earm):.1f}%",f"{max(earm):.0f}%","weakest rail; stall-heavy code is the limit"),
-   ("SUM  (what a power budget cares about)",f"{st.mean(esum):.1f}%",f"{p90(esum):.1f}%",f"{max(esum):.1f}%",f"worst case {max(esum):.1f}% ({worst_app})")]
-table(s,.6,2.6,12.1,(4.6,1.5,1.5,1.5,3.0),("rail","MAPE","p90","worst","note"),v,fsz=12,rh=0.46,bold_cols=(0,1))
-tb(s,.6,4.35,12.1,.34,"p90 is reported beside the mean deliberately: a MAPE alone hides a tail, and the tail is where a power budget gets hurt.",11,False,MUTED)
-tb(s,.6,4.75,12.1,.5,"Published per-rail models report single-digit error on unseen workloads as the GOOD outcome. "
-   "Walker (TCAD 2017) and McCullough (ATC 2011) both warn that sub-3% on unseen workloads is a reason to "
-   "distrust your own validation set — not to celebrate.",12,False,INK)
-tb(s,.6,5.55,12.1,.4,"No published work was found doing this: functional-emulator activity calibrated against "
-   "per-rail measured SoC power. The pieces exist separately; the composition appears to be new.",12,True,ACCENT)
+s=slide("Two questions","The second one is the one people ask for. The first one is the one that has to be true first.")
+q=[("1","Can QEMU predict the ACTIVITY a workload generates on silicon?",
+    f"YES for instruction activity \u2014 {st.mean(IE):.1f}% mean error over 50 applications, {sum(1 for x in IE if x<=2)} of 50 within 2%.",
+    f"Memory bandwidth is over-reported by roughly 2x. Bounded, understood, and localised to streaming workloads."),
+   ("2","Can that activity be turned into a POWER number?",
+    f"YES \u2014 {st.mean(esum):.1f}% mean error on total power, {max(esum):.1f}% worst, on 50 applications the model never saw.",
+    f"And {st.mean([float(r['err_qemu']) for r in mc if r['case'].startswith('e')]):.1f}% on concurrent multi-application mixes, predicted from QEMU alone.")]
+y=1.62
+for n,ques,ans,cav in q:
+    box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(y),Inches(12.1),Inches(2.30))
+    box.fill.solid(); box.fill.fore_color.rgb=RGBColor(0xF4,0xF7,0xFB); box.line.color.rgb=ACCENT
+    num=s.shapes.add_shape(MSO_SHAPE.OVAL,Inches(.95),Inches(y+.30),Inches(.62),Inches(.62))
+    num.fill.solid(); num.fill.fore_color.rgb=ACCENT; num.line.fill.background()
+    tb(s,.95,y+.38,.62,.5,n,20,True,WHITE,PP_ALIGN.CENTER)
+    tb(s,1.78,y+.22,10.6,.44,ques,17,True,INK)
+    bar=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(1.78),Inches(y+.78),Inches(10.6),Inches(.62))
+    bar.fill.solid(); bar.fill.fore_color.rgb=GREEN; bar.line.fill.background()
+    tb(s,1.96,y+.86,10.3,.5,ans,14,True,WHITE)
+    tb(s,1.78,y+1.48,10.6,.70,cav,12,False,MUTED)
+    y+=2.54
+tb(s,.6,6.62,12.1,.3,"Every number on this page is measured on silicon and predicted from an emulator that never ran on it.",11,True,ACCENT)
 
 # ── 3 · what we actually did ───────────────────────────────────────────────
 s=slide("What we did","Eight steps, in order. Each one had to work before the next was meaningful.")
@@ -113,8 +127,65 @@ steps=[("1","Get the instrument","IMX95LPD5EVK-19 — the only i.MX 95 board wit
  ("8","Measure and compare",f"{st.mean(esum):.1f}% mean error on total power.")]
 table(s,.6,1.6,12.1,(0.5,3.4,8.2),("#","step","what came out"),steps,fsz=10.5,rh=0.55,bold_cols=(1,))
 
+# ── 4 · PART 1 · instruction activity ──────────────────────────────────────
+AFOOT=("wattson activity \u00b7 QEMU counts DERIVED from TCG plugins \u00b7 silicon counts MEASURED via ARM PMU "
+       "on i.MX95 (A55 core 0, pinned 1.8 GHz) \u00b7 2026-09-10")
+s=slide("Part 1 \u2014 Does QEMU see the work the silicon does?",
+        "Instruction activity: QEMU's count against the A55's own inst_retired counter, same binary, same input, 50 applications.",foot=AFOOT)
+band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(.6),Inches(1.62),Inches(12.1),Inches(.62))
+band.fill.solid(); band.fill.fore_color.rgb=GREEN; band.line.fill.background()
+tb(s,.9,1.70,11.6,.44,f"{st.mean(IE):.2f}% mean error, {st.median(IE):.2f}% median. QEMU counts the work.",18,True,WHITE)
+buckets=[("within 0.5%",sum(1 for x in IE if x<=0.5)),("within 1%",sum(1 for x in IE if x<=1)),
+         ("within 2%",sum(1 for x in IE if x<=2)),("within 5%",sum(1 for x in IE if x<=5)),
+         ("above 5%",sum(1 for x in IE if x>5))]
+x=.6
+for lab,cnt in buckets:
+    col=GREEN if 'within' in lab else AMBER
+    bx=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(x),Inches(2.46),Inches(2.32),Inches(1.16))
+    bx.fill.solid(); bx.fill.fore_color.rgb=RGBColor(0xF4,0xF7,0xFB); bx.line.color.rgb=col
+    tb(s,x,2.60,2.32,.62,f"{cnt}",34,True,col,PP_ALIGN.CENTER)
+    tb(s,x,3.20,2.32,.32,f"of 50 {lab}",11,False,MUTED,PP_ALIGN.CENTER)
+    x+=2.45
+tb(s,.6,3.82,12.1,.32,"The ten applications that agree least well \u2014 the whole tail, nothing hidden:",11.5,True,INK)
+w=sorted(ACT,key=lambda r:-abs(r['ierr']))[:10]
+d=[(r['app'],f"{r['qi']/1e9:.2f}",f"{r['si']/1e9:.2f}",f"{r['ierr']:+.1f}%") for r in w]
+def cfi(ri,c):
+    if c==3:
+        v=abs(float(d[ri][3].rstrip('%'))); return GREEN if v<=2 else (AMBER if v<=8 else RED)
+    return None
+half=len(d)//2
+table(s,.6,4.20,5.9,(1.9,1.35,1.35,1.3),("application","QEMU G-insn","silicon G-insn","error"),d[:half],fsz=11,rh=.36,bold_cols=(0,3),color_fn=cfi)
+def cfi2(ri,c):
+    if c==3:
+        v=abs(float(d[half+ri][3].rstrip('%'))); return GREEN if v<=2 else (AMBER if v<=8 else RED)
+    return None
+table(s,6.8,4.20,5.9,(1.9,1.35,1.35,1.3),("application","QEMU G-insn","silicon G-insn","error"),d[half:],fsz=11,rh=.36,bold_cols=(0,3),color_fn=cfi2)
+tb(s,.6,6.55,12.1,.5,"This is the activity factor a power model consumes. It is also, on its own, the thing you want when you are "
+   "reading code flows and usage \u2014 how much work a workload does, where it does it, and how that changes when the code changes.",11,False,ACCENT)
+
+# ── 5 · PART 1 · bandwidth, the honest limit ───────────────────────────────
+s=slide("Part 1 \u2014 Where QEMU does not see the same work",
+        "Memory bandwidth. QEMU's DRAM proxy against the A55's l3d_cache_refill counter.",foot=AFOOT)
+band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(.6),Inches(1.62),Inches(12.1),Inches(.62))
+band.fill.solid(); band.fill.fore_color.rgb=AMBER; band.line.fill.background()
+tb(s,.9,1.72,11.6,.46,"QEMU over-reports DRAM bandwidth by roughly 2x \u2014 the one place it does not match the silicon.",17,True,WHITE)
+d=[(r['app'],f"{r['qb']:.2f}",f"{r['sb']:.2f}",f"{r['berr']:+.0f}%",f"{(r['qb']-r['sb'])*60.62:.0f} mW") for r in HIBW]
+def cfb(ri,c):
+    return RED if c==3 else None
+table(s,.6,2.50,12.1,(2.4,2.3,2.5,2.0,2.9),
+      ("application","QEMU GB/s","silicon GB/s","error","core-rail impact"),d,fsz=12,rh=.44,bold_cols=(0,3),color_fn=cfb)
+tb(s,.6,4.30,12.1,.34,f"Those are the only {len(HIBW)} applications of 50 that exceed 0.5 GB/s.",12,True,INK)
+tb(s,.6,4.72,12.1,1.05,"The cause is write streaming: the A55 skips read-for-ownership on a full cache-line write, so the line is "
+   "never fetched from DRAM. QEMU's cache model allocates it anyway and counts a transaction the silicon never issued. "
+   "It is a known, single-mechanism gap \u2014 not noise \u2014 and it is the one piece of upstream work this campaign produced.",11.5,False,MUTED)
+box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(5.86),Inches(12.1),Inches(1.06))
+box.fill.solid(); box.fill.fore_color.rgb=RGBColor(0xF4,0xF7,0xFB); box.line.color.rgb=ACCENT
+tb(s,.9,5.98,11.5,.84,"Why the power result survives it: 47 of 50 applications run below 0.5 GB/s, where the entire bandwidth term is "
+   "worth under 27 mW of a ~1400 mW budget. The error is real, it is in the right place to be harmless for application "
+   "workloads, and it is the first thing to fix before this is pointed at streaming or DMA-heavy code.",12,False,INK)
+
 # ── 4 · the models ─────────────────────────────────────────────────────────
-s=slide("The models","Measured on silicon, driven by QEMU activity. Valid at the stated OPP — the frequency is part of the claim.")
+s=slide("Part 2 \u2014 The power models","Measured on silicon, driven by QEMU activity. Valid at the stated OPP — the frequency is part of the claim.")
 box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(1.6),Inches(12.1),Inches(2.0))
 box.fill.solid(); box.fill.fore_color.rgb=ZEBRA; box.line.color.rgb=ACCENT; box.line.width=Pt(1.5)
 tb(s,.9,1.75,11.5,.36,"vdd_arm  =  243.8  +  0.1266·ALU Mops/s  +  60.62·GB/s  +  169.3·active_cores",15,True,ACCENT,font="Consolas")
@@ -129,7 +200,7 @@ tb(s,.6,5.6,12.1,.5,"⚠ The DRAM fit with the HIGHER R² is the more dangerous 
    "negative BW² term predicts FALLING power above ~17 GB/s. The √ form costs 0.004 of R² and stays physical.",11.5,True,AMBER)
 
 # ── 5 · the finding ────────────────────────────────────────────────────────
-s=slide("The finding that changes the activity factor","We expected instruction count to drive core power. It does not.")
+s=slide("Part 2 \u2014 The finding that changes the model","We expected instruction count to drive core power. It does not.")
 box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(1.55),Inches(12.1),Inches(1.35))
 box.fill.solid(); box.fill.fore_color.rgb=ZEBRA; box.line.color.rgb=RED; box.line.width=Pt(1.5)
 tb(s,.9,1.68,11.5,.42,"instructions alone:  R² = 0.031        mean error 48%,  worst 149%",19,True,RED,font="Consolas")
@@ -144,7 +215,7 @@ tb(s,.6,5.4,12.1,.4,"Consequence: an activity factor built on instruction count 
    "memory-bound workloads that dominate a real power budget.",12,True,GREEN)
 
 # ── 6 · the blind test ─────────────────────────────────────────────────────
-s=slide("The blind test — 50 applications","Predictions committed to git before the board was touched. This is the headline result.")
+s=slide("Part 2 — The blind test, 50 applications","Predictions committed to git before the board was touched. This is the headline result.")
 tb(s,.6,1.5,12.1,.34,"Coefficients fitted on an 11-point synthetic alu/mem grid. None of these 50 applications appear in it.",12,True)
 top=sorted(rows,key=lambda r:-f(r,'meas_sum'))[:6]
 bot=sorted(rows,key=lambda r:f(r,'meas_sum'))[:4]
@@ -170,7 +241,7 @@ tb(s,.6,6.2,12.1,.4,f"Predictions run {abs(st.mean(sgn)):.1f}% low on average �
    "and therefore correctable if a future revision wants it.",11.5,False,INK)
 
 # ── 7 · all fifty ──────────────────────────────────────────────────────────
-s=slide("All fifty applications","Every prediction, every measurement. Nothing selected, nothing dropped.")
+s=slide("Part 2 \u2014 All fifty applications","Every prediction, every measurement. Nothing selected, nothing dropped.")
 tb(s,.6,1.44,12.1,.3,"GREEN \u2264 8% error   ·   AMBER 8\u201312%   ·   RED > 12%      "
    "\u2014 the 8% line is the published bar for a good per-rail model, and is this corpus's own p90 (8.3%).",
    10.5,True,MUTED)
@@ -198,7 +269,7 @@ tb(s,.9,6.46,11.5,.4,f"{n_g} of 50 within 8%   ·   {n_a} between 8 and 12%   ·
 # ── 8 · multi-core, realistic edge mix ─────────────────────────────────────
 MFOOT=("wattson power \u00b7 rails MEASURED on IMX95LPD5EVK-19 (NXP BCU) \u00b7 A55 die 40\u201341 \u00b0C \u00b7 "
        "activity DERIVED from QEMU TCG; PMU column MEASURED on silicon \u00b7 2026-09-10")
-s=slide("A realistic edge workload \u2014 all six cores busy",
+s=slide("Part 2 \u2014 A realistic edge workload, all six cores busy",
         "Perception, inference, storage, networking, imaging, rendering, running at the same time. "
         "Predicted from QEMU alone: no silicon counter is used for these mixes.",foot=MFOOT)
 edge=[r for r in mc if r['case'].startswith('e')]
@@ -234,22 +305,51 @@ tb(s,.6,6.36,12.1,.66,"The last column re-runs each prediction using activity me
 
 # ── 8 · what this licenses ─────────────────────────────────────────────────
 s=slide("What this licenses, and what it does not","The trust statement, quantity by quantity.")
-lic=[("predict total power of an unseen app","YES",f"{st.mean(esum):.1f}% mean, {max(esum):.1f}% worst, 50 held-out applications"),
-     ("predict vdd_soc","YES","4.5% mean, 8% worst — the strongest single result"),
-     ("predict vdd_arm for compute-bound code","YES","7.1% median, 16.3% p90"),
-     ("predict vdd_arm for stall-heavy code","NO","up to 20% over — the insns/3 proxy overstates it"),
-     ("predict a realistic multi-app mix","YES","2.7% mean on edge workloads; 6 apps on 6 cores, 3.9% worst"),
+lic=[("predict the INSTRUCTION activity of an unseen app","YES",f"{st.mean(IE):.2f}% mean, {sum(1 for x in IE if x<=2)} of 50 within 2%"),
+     ("predict DRAM BANDWIDTH","NO","over-reports ~2x; write streaming is not modelled"),
+     ("predict total power of an unseen app","YES",f"{st.mean(esum):.1f}% mean, {max(esum):.1f}% worst, 50 held-out applications"),
+     ("predict vdd_soc","YES",f"{st.mean(esoc):.1f}% mean, {max(esoc):.1f}% worst \u2014 the strongest single result"),
+     ("predict vdd_arm on its own","PARTLY",f"{st.median(earm):.1f}% median but {max(earm):.1f}% worst; use the SUM, not this rail alone"),
+     ("predict a concurrent multi-app mix","YES",f"{st.mean([float(r['err_qemu']) for r in mc if r['case'].startswith('e')]):.1f}% mean, "
+      f"{max(float(r['err_qemu']) for r in mc if r['case'].startswith('e')):.1f}% worst, 2\u20136 apps"),
+     ("predict streaming or DMA-heavy code","NO","the bandwidth gap lands directly on it"),
      ("use these coefficients at another frequency","NO","1800 MHz set; vdd_soc transfers, vdd_arm does not"),
      ("use these coefficients on another SoC","NO","stall-power sign is microarchitecture-specific"),
-     ("emit watts from QEMU alone","NO","QEMU supplies ACTIVITY; time and energy coefficients come from silicon")]
+     ("emit watts from QEMU alone","NO","QEMU supplies ACTIVITY; energy coefficients come from silicon")]
 def lc(ri,c):
-    if c==1: return GREEN if lic[ri][1]=="YES" else RED
+    if c==1: return {"YES":GREEN,"PARTLY":AMBER}.get(lic[ri][1],RED)
     return None
-table(s,.6,1.6,12.1,(4.6,1.1,6.4),("claim","verdict","basis"),lic,fsz=11,rh=0.46,bold_cols=(0,1),color_fn=lc)
-tb(s,.6,5.2,12.1,.5,"The standing rule survives the campaign unchanged: QEMU measures activity, engineers convert "
+table(s,.6,1.58,12.1,(4.7,1.15,6.25),("claim","verdict","basis"),lic,fsz=10.5,rh=0.40,bold_cols=(0,1),color_fn=lc)
+tb(s,.6,6.02,12.1,.5,"The standing rule survives the campaign unchanged: QEMU measures activity, engineers convert "
    "activity to energy. A board that reads real watts is exactly when that discipline matters most.",12,True,ACCENT)
-tb(s,.6,5.9,12.1,.6,"Everything above is reproducible from the repo: frozen predictions in git before measurement, "
+tb(s,.6,6.60,12.1,.5,"Everything above is reproducible from the repo: frozen predictions in git before measurement, "
    "raw per-app pairs in RESULTS-50.csv, and every limit stated beside the number it qualifies.",11.5,False,MUTED)
+
+
+# ── 11 · what this means ───────────────────────────────────────────────────
+s=slide("What this actually means","The result is not the point. What it licenses us to do next is the point.")
+pts=[("1","Predicting power on working silicon is not, by itself, worth much.",
+      "If the part exists, you can put a meter on it. Everything in this deck was validated against a board we already had \u2014 "
+      "that is what makes it evidence, not what makes it useful."),
+     ("2","So the value has to be collected BEFORE there is silicon.",
+      "Which sets a hard prerequisite on the program: a settled architecture and memory map, early, well ahead of tapeout \u2014 "
+      "enough to stand up a QEMU model and boot a full Linux BSP on it. That is the gate. Not the power work; the model underneath it."),
+     ("3","Once that exists, this campaign says both halves work.",
+      "QEMU predicts the activity factors \u2014 usable on their own for reading code flows, usage and where the work lands. "
+      "And those activity factors, fed to a power model carrying estimated gate power, produce power estimates that held to "
+      "single digits against real rails.")]
+y=1.58
+for n,head,body in pts:
+    num=s.shapes.add_shape(MSO_SHAPE.OVAL,Inches(.62),Inches(y+.04),Inches(.62),Inches(.62))
+    num.fill.solid(); num.fill.fore_color.rgb=ACCENT; num.line.fill.background()
+    tb(s,.62,y+.12,.62,.5,n,20,True,WHITE,PP_ALIGN.CENTER)
+    tb(s,1.45,y,11.3,.46,head,16,True,INK)
+    tb(s,1.45,y+.48,11.3,.92,body,12,False,MUTED)
+    y+=1.62
+box=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(.6),Inches(6.32),Inches(12.1),Inches(.80))
+box.fill.solid(); box.fill.fore_color.rgb=INK; box.line.fill.background()
+tb(s,.9,6.44,11.6,.62,"The division of labour: QEMU supplies the activity. The power model supplies the energy. "
+   "Neither one is asked to do the other's job.",14,True,WHITE)
 
 prs.save("wattson-power.pptx")
 print(f"wattson-power.pptx — {PAGE[0]} slides")
