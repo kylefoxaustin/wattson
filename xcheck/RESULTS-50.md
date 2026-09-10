@@ -110,8 +110,14 @@ is indistinguishable from one that ran cheaply.
 ## Multi-application — realistic edge mixes
 
 Single-application numbers do not tell you whether the model survives a product
-workload. These are concurrent mixes drawn from the same 50, chosen to look
-like something an edge device actually runs.
+workload. These are concurrent mixes drawn from the same 50.
+
+⚠️ **Naming:** an earlier version called these "AI + vision". That was
+wrong. `pacman` is a game agent trained by a genetic algorithm and `sgm` is
+semi-global stereo disparity — classical computer vision, not a learned model.
+**No neural-network inference exists anywhere in the 50-app corpus**, so
+nothing here should be read as an NPU or CNN result. The mixes are named for
+what the binaries actually do.
 
 **No silicon counter is used to predict these mixes.** Per-application activity
 comes from QEMU; each application's *solo* iteration rate (frozen in
@@ -120,9 +126,9 @@ end-to-end QEMU→silicon prediction rather than a curve fit on silicon activity
 
 | workload | applications running concurrently | cores | pred mW | meas mW | err | err (PMU) |
 |---|---|---:|---:|---:|---:|---:|
-| AI + vision | pacman  +  sgm stereo | 2 | 1605 | 1704 | 5.8% | 6.0% |
-| AI + vision + DB + net | pacman  +  sgm  +  sqlite  +  httpp | 4 | 2123 | 2189 | 3.0% | 3.1% |
-| full edge stack, every core | pacman  +  sgm  +  sqlite  +  httpp  +  qoi  +  ray | 6 | 2612 | 2561 | 2.0% | 0.7% |
+| game + disparity | pacman  +  sgm stereo | 2 | 1605 | 1704 | 5.8% | 6.0% |
+| game + disparity + DB + net | pacman  +  sgm  +  sqlite  +  httpp | 4 | 2123 | 2189 | 3.0% | 3.1% |
+| six workloads, every core | pacman  +  sgm  +  sqlite  +  httpp  +  qoi  +  ray | 6 | 2612 | 2561 | 2.0% | 0.7% |
 
 **Mean 3.6%, worst 5.8%** across two to six concurrent applications.
 

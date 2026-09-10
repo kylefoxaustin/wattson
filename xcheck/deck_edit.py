@@ -72,6 +72,35 @@ def table(s, x, y, w, col_w, hdr, data, fsz=10.5, rh=0.32, bold_cols=(), color_f
                 if col: run.font.color.rgb = col
     return t
 
+
+def tables(slide_idx):
+    return [sh.table for sh in prs.slides[slide_idx].shapes if sh.has_table]
+
+def set_cell(tbl, ri, ci, text, bold=None, color=None, fsz=None):
+    cell = tbl.cell(ri, ci); para = cell.text_frame.paragraphs[0]
+    if para.runs:
+        keep = para.runs[0]
+        keep.text = text
+        for r in para.runs[1:]: r.text = ''
+        if bold is not None: keep.font.bold = bold
+        if color is not None: keep.font.color.rgb = color
+        if fsz is not None: keep.font.size = Pt(fsz)
+    else:
+        cell.text = text
+
+def clone_row(tbl):
+    """Append a copy of the last row (keeps fill/format) and blank its text."""
+    last = tbl._tbl.tr_lst[-1]
+    new = copy.deepcopy(last)
+    tbl._tbl.append(new)
+    ri = len(tbl.rows) - 1
+    for ci in range(len(tbl.columns)): set_cell(tbl, ri, ci, '')
+    return ri
+
+
+def drop_shape(slide_idx, sh):
+    sh._element.getparent().remove(sh._element)
+
 def titles():
     out = []
     for sl in prs.slides:
@@ -117,8 +146,7 @@ replace_text(1, "And 3.6% on concurrent multi-application mixes, predicted from 
              "the mW-per-unit-activity always comes from measured silicon.")
 replace_text(1, "predicted from an QEMU emulator", "predicted from a QEMU emulator")
 replace_text(9, "Predicted from QEMU alone: no silicon counter is used for these mixes.",
-             "No silicon ACTIVITY counter feeds these predictions — the activity is QEMU's. The energy "
-             "coefficients, as everywhere in this deck, were measured on silicon.")
+             "No silicon ACTIVITY counter feeds these predictions — the activity is QEMU's.")
 replace_text(11, "And those activity factors, fed to a power model carrying estimated gate power, produce power "
                  "estimates that held to single digits against real rails.",
              "And fed to a power model, those activity factors produced power estimates that held to single "
@@ -200,6 +228,63 @@ for i, (a_, b_) in enumerate([
     tb(s, 4.15, yy, 8.5, .32, b_, 12, False, MUTED)
 tb(s, .6, 6.80, 12.1, .3, "The spreadsheet keeps its job. It just stops being multiplied by a number nobody can "
    "trace to anything.", 11.5, True, ACCENT)
+
+
+# 5 · the mixes were mislabelled as AI/inference. pacman is a genetic-algorithm
+#     game-agent trainer (GP evolution) and sgm is semi-global stereo matching.
+#     Neither is neural-network inference, and no NN/NPU workload exists in the
+#     50-app corpus at all. Relabelled to what the binaries actually are.
+_t = tables(9)[0]
+set_cell(_t, 1, 0, "game + disparity", fsz=10.5)
+set_cell(_t, 2, 0, "game + disparity + DB + net", fsz=10.5)
+set_cell(_t, 3, 0, "six workloads, every core", fsz=10.5)
+replace_text(9, "Perception, inference, storage, networking, imaging, rendering, running at the same time.",
+             "Game, stereo disparity, storage, networking, imaging and rendering, all at once.")
+replace_text(9, "pacman = genetic-AI trainer", "pacman = game agent trained by genetic algorithm")
+replace_text(9, "sgm = stereo-vision disparity on real imagery",
+             "sgm = semi-global stereo disparity on real imagery")
+
+# 6 · the title claimed an "edge workload"; these are ordinary concurrent
+#     applications, so the title says that instead.
+replace_text(9, "A more realistic edge workload", "Several real applications at once")
+
+
+# 7 · slide 10 geometry: the honest labels are longer than the ones they
+#     replaced, so widen the first column out of column 2's slack.
+for _tb2 in tables(9):
+    _tb2.columns[0].width = Inches(3.35)
+    _tb2.columns[1].width = Inches(3.95)
+replace_text(9, "Several real applications at once", "Several apps at once")
+
+# 8 · per-app DDR bandwidth belongs on the per-app slide. Rebuild the three
+#     tables with a MEASURED GB/s column; the originals had no room for it.
+_act = {r['app']: r for r in csv.DictReader(open('RESULTS-activity.csv'))}
+_rows = list(csv.DictReader(open('RESULTS-50.csv')))
+def _fv(r, k): return float(r[k])
+_allr = sorted(_rows, key=lambda r: -_fv(r, 'meas_sum'))
+for _sh in [x for x in prs.slides[8].shapes if x.has_table]:
+    drop_shape(8, _sh)
+_XS = [.6, 4.85, 9.10]
+for _ci, _chunk in enumerate([_allr[0:17], _allr[17:34], _allr[34:50]]):
+    _d = [(r['app'][:12], f"{_fv(r,'pred_sum'):.0f}", f"{_fv(r,'meas_sum'):.0f}",
+           f"{_fv(r,'err_sum'):.0f}%", f"{float(_act[r['app']]['silicon_GBps']):.2f}")
+          for r in _chunk]
+    def _mk(dd):
+        def cf(ri, c):
+            if c == 3:
+                v = float(dd[ri][3].rstrip('%'))
+                return GREEN if v <= 8 else (AMBER if v <= 12 else RED)
+            if c == 4:
+                return ACCENT if float(dd[ri][4]) >= 0.25 else MUTED
+            return None
+        return cf
+    table(prs.slides[8], _XS[_ci], 1.82, 4.05, (1.30, .70, .70, .66, .69),
+          ("app", "pred", "meas", "err", "GB/s"), _d, fsz=8.5, rh=0.245,
+          bold_cols=(0,), color_fn=_mk(_d))
+replace_text(8, "GREEN ≤ 8% error   ·   AMBER 8–12%   ·   RED > 12%      — the 8% line is the published bar "
+                "for a good per-rail model, and is this corpus's own p90 (8.3%).",
+             "GREEN ≤ 8%  ·  AMBER 8–12%  ·  RED > 12%   (8% = the published bar for a good per-rail model)"
+             "   ·   GB/s = DDR bandwidth, MEASURED on silicon")
 
 # both new slides land before the closing slide
 move_slide(12, 11)   # anatomy   -> index 11
