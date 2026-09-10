@@ -39,25 +39,76 @@ own PMU. All 50 applications, in `RESULTS-activity.csv`.
 | within 2% | 41 of 50 |
 | worst | 15.4% (`bb-cksum`) |
 
-**Bandwidth — no.** QEMU's DRAM proxy over-reports against `l3d_cache_refill`:
+**Bandwidth — mostly, with one clear exception.**
 
-| app | QEMU GB/s | silicon GB/s | error |
+| app | QEMU reads GB/s | silicon reads GB/s | error |
 |---|---:|---:|---:|
-| `mem-w` | 4.66 | 2.62 | +78% |
-| `mem` | 4.93 | 2.53 | +95% |
+| `mem-w` | 2.33 | 2.62 | -11% |
+| `mem` | 2.47 | 2.53 | -2% |
 | `mm-big` | 1.49 | 0.60 | +149% |
+| `chase-big` | 0.45 | 0.45 | -1% |
+| `chase` | 0.45 | 0.45 | -1% |
+| `mm` | 0.20 | 0.32 | -37% |
+| `parson` | 0.35 | 0.32 | +11% |
+| `lz4-fast` | 0.38 | 0.31 | +22% |
+| `rd-life` | 0.57 | 0.31 | +84% |
 
-Those are the only 3 of 50 applications above 0.5 GB/s. The cause is
-**write streaming**: the A55 skips read-for-ownership on a full cache-line
-write, so the line is never fetched. QEMU's cache model allocates it anyway and
-counts a transaction the silicon never issues. Single mechanism, not noise.
+The streaming workloads — where absolute bandwidth is largest and therefore
+where it matters most for power — agree to within 11%. What is genuinely off is
+`mm-big` (+149%) and `rd-life` (+84%): small-footprint, reuse-heavy workloads
+where a modelled cache and a real one diverge most. Neither moves enough
+traffic to cost more than a few mW.
 
-⭐ **Why the power result survives it.** 47 of 50 applications run below
-0.5 GB/s, where the whole bandwidth term is worth under 27 mW against a
-~1400 mW budget. The error is real and it is in the place where it does least
-damage for application workloads. It is also the first thing to fix before any
-of this is pointed at streaming or DMA-heavy code — and it is the one piece of
-upstream QEMU work this campaign produced.
+⚠️ **Correction 3 — the "2x over-report" was a unit error, not a QEMU defect.**
+An earlier version of this section reported QEMU over-reporting bandwidth by
+78–149% and attributed it to unmodelled write streaming. That compared QEMU's
+`dram_bytes_proxy`, which counts read **and write** transactions, against
+`l3d_cache_refill`, which is a **refill** counter and sees reads only. The
+like-for-like quantity is `dram_read_proxy`, and on that basis `mem` is −2% and
+`mem-w` −11%.
+
+The frozen predictions are unaffected: they fed total traffic into a
+coefficient calibrated against total traffic, which is self-consistent.
+Re-running all 50 with reads-only makes the result *worse* (6.4% → 7.0%, with
+`mem`/`mem-w` regressing ~10pp), which is itself the evidence that the model's
+bandwidth term means total traffic.
+
+Rule earned: **two counters with similar names are not the same quantity.** A
+refill counter and a transaction counter differ by exactly the write traffic,
+and the difference looks like a plausible modelling defect.
+
+### The bandwidth corner — where the model actually breaks
+
+The corpus tops out at 0.60 GB/s for a real application while the model is
+fitted to 14 GB/s, so its largest coefficient was validated across 4% of its
+range. Four purpose-written workloads (`bwbench.c`) occupy the gap:
+
+| workload | GB/s | pred mW | meas mW | err |
+|---|---:|---:|---:|---:|
+| blit 4MB — large memcpy (replicate) | 11.12 | 2203 | 1944 | 13.3% |
+| blit 256MB — large memcpy | 10.85 | 2180 | 1947 | 12.0% |
+| reduce 256MB — array reduction | 5.47 | 1774 | 1797 | 1.3% |
+| spmv 64MB — sparse gather | 0.47 | 1305 | 1330 | 1.9% |
+| yuv 1080p — YUV420→RGB565 | 0.22 | 1393 | 1456 | 4.3% |
+
+⭐ **A pure read stream at 5.5 GB/s predicts to 1.3%** — the model extrapolates
+9x past the corpus without trouble. **A 50/50 read+write stream at 11 GB/s
+over-predicts by 12–13%.** The model carries one bandwidth term, so a written
+byte is charged the same power as a read byte, and a written byte evidently
+costs less. Nothing in the 50-app corpus was write-heavy enough to expose it.
+Separate read and write coefficients are the obvious next refinement.
+
+Two workload guesses were wrong and are recorded as such: YUV→RGB frame
+conversion is **compute-bound** (1.4 IPC, 0.15 GB/s) and sparse gather is
+**latency-bound** (0.058 IPC). "Memory-bound" splits into stall-heavy and
+streaming, and only streaming generates volume.
+
+⚠️ **Known gap:** the PMU cross-check is absent for these five runs. `perf`
+returned idle-level counts although the board was clearly loaded (+650–800 mW,
+iteration counts confirm the work), and a direct test with the workload
+launched in the same ssh session counts correctly — so it is the harness's
+cross-session launch, not the counters. The prediction path uses no silicon
+counter, so the result stands; the cross-check does not. Not root-caused.
 
 ⚠️ **Provenance:** QEMU counts DERIVED from TCG plugins (linux-user); silicon
 counts MEASURED via ARM PMU on i.MX95, A55 core 0, pinned at 1.8 GHz.

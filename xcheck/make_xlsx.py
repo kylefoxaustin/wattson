@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regenerate RESULTS-50.xlsx from the CSVs. Committed so the workbook can be
 re-derived and audited rather than taken on trust."""
-import csv, statistics as st
+import csv, os, statistics as st
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 
@@ -29,31 +29,34 @@ wb = Workbook(); wb.remove(wb.active)
 act = list(csv.DictReader(open('RESULTS-activity.csv')))
 ws = wb.create_sheet('activity factors')
 header(ws, ['app', 'QEMU insns', 'silicon insns', 'insn err %',
-            'QEMU GB/s', 'silicon GB/s', 'bandwidth err %', 'elapsed s'])
+            'QEMU read GB/s', 'silicon read GB/s', 'read err %',
+            'QEMU total GB/s (model input)', 'elapsed s'])
 for r in act:
-    be = float(r['bw_err']) if r['bw_err'] else None
+    be = float(r['read_err']) if r['read_err'] else None
     ws.append([r['app'], float(r['qemu_insns']), float(r['silicon_insns']), float(r['insn_err']),
-               float(r['qemu_GBps']), float(r['silicon_GBps']), be, float(r['elapsed_s'])])
+               float(r['qemu_read_GBps']), float(r['silicon_read_GBps']), be,
+               float(r['qemu_total_GBps']), float(r['elapsed_s'])])
     c = ws.cell(ws.max_row, 4); v = abs(float(r['insn_err']))
     c.fill = G if v <= 2 else (A if v <= 8 else R); c.number_format = '0.00'
-    if be is not None and float(r['silicon_GBps']) >= 0.5:
+    if be is not None and float(r['silicon_read_GBps']) >= 0.25:
         c2 = ws.cell(ws.max_row, 7)
-        c2.fill = R if abs(be) > 25 else A; c2.number_format = '0.0'
+        c2.fill = R if abs(be) > 60 else (A if abs(be) > 25 else G); c2.number_format = '0.0'
     for col in (2, 3): ws.cell(ws.max_row, col).number_format = '#,##0'
-    for col in (5, 6): ws.cell(ws.max_row, col).number_format = '0.000'
+    for col in (5, 6, 8): ws.cell(ws.max_row, col).number_format = '0.000'
     ws.cell(ws.max_row, 1).font = Font(bold=True)
 ie = [abs(float(r['insn_err'])) for r in act]
 ws.append([])
 ws.append([f'instructions: MAPE {st.mean(ie):.2f}%, median {st.median(ie):.2f}%, '
            f'{sum(1 for x in ie if x <= 2)} of {len(ie)} within 2%'])
 ws.cell(ws.max_row, 1).font = Font(bold=True, color='1F3864')
-ws.append(['bandwidth error is only meaningful for the 3 applications above 0.5 GB/s; '
-           'below that the absolute traffic is too small for the ratio to mean anything'])
+ws.append(['l3d_cache_refill is a REFILL counter and sees READS; the like-for-like QEMU quantity is '
+           'dram_read_proxy. The model is driven by TOTAL traffic (last column), which is the quantity '
+           'its coefficient was calibrated against.'])
 ws.cell(ws.max_row, 1).font = Font(italic=True, size=9, color='808080')
 ws.append(['QEMU counts DERIVED from TCG plugins (linux-user); silicon counts MEASURED via ARM PMU '
            '(i.MX95, A55 core 0, pinned 1.8 GHz)'])
 ws.cell(ws.max_row, 1).font = Font(italic=True, size=9, color='808080')
-for col, w in zip('ABCDEFGH', (14, 15, 15, 11, 11, 12, 15, 10)):
+for col, w in zip('ABCDEFGHI', (14, 15, 15, 11, 14, 15, 11, 24, 10)):
     ws.column_dimensions[col].width = w
 ws.freeze_panes = 'B2'
 
@@ -110,6 +113,28 @@ ws.cell(ws.max_row, 1).font = Font(italic=True, size=9, color='808080')
 for col, w in zip('ABCDEFGHIJKLM', (26, 40, 7, 10, 14, 11, 14, 11, 13, 13, 10, 9, 10)):
     ws.column_dimensions[col].width = w
 ws.freeze_panes = 'A2'
+
+# ── bandwidth corner ──────────────────────────────────────────────────────
+if os.path.exists('RESULTS-bandwidth.csv'):
+    bw = list(csv.DictReader(open('RESULTS-bandwidth.csv')))
+    ws = wb.create_sheet('bandwidth corner')
+    header(ws, ['case', 'workload', 'GB/s', 'ALU Mops/s', 'pred mW', 'meas mW', 'err %', 'iters/s'])
+    for r in sorted(bw, key=lambda r: -float(r['GBps'])):
+        e = float(r['err_pct'])
+        ws.append([r['case'], r['workload'], float(r['GBps']), float(r['aluMps']),
+                   float(r['pred_mW']), float(r['meas_mW']), e, float(r['iters_per_s'])])
+        shade(ws.cell(ws.max_row, 7), e if e <= 8 else (9 if e <= 15 else 20))
+        ws.cell(ws.max_row, 7).number_format = '0.0'
+    ws.append([])
+    ws.append(['A pure READ stream at 5.5 GB/s predicts to 1.3%. A 50/50 read+write stream at 11 GB/s '
+               'over-predicts 12-13%: the model has ONE bandwidth term, so a written byte is charged the '
+               'same as a read byte.'])
+    ws.cell(ws.max_row, 1).font = Font(bold=True, color='1F3864')
+    ws.append(['Predicted from QEMU activity scaled by the silicon iteration rate; no silicon counter in '
+               'the prediction path. Power MEASURED via BCU busy-window median.'])
+    ws.cell(ws.max_row, 1).font = Font(italic=True, size=9, color='808080')
+    for col, w in zip('ABCDEFGH', (13, 34, 9, 12, 10, 10, 8, 9)):
+        ws.column_dimensions[col].width = w
 
 # ── summary ───────────────────────────────────────────────────────────────
 ws = wb.create_sheet('summary')

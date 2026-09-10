@@ -326,21 +326,21 @@ def _cfb(ri, c):
         return GREEN if v <= 25 else (AMBER if v <= 60 else RED)
     return None
 table(_s4, .6, 2.40, 6.6, (1.9, 1.6, 1.6, 1.5),
-      ("application", "QEMU reads", "silicon reads", "error"), _d, fsz=11, rh=.36,
+      ("application", "QEMU reads", "silicon reads", "error"), _d, fsz=11, rh=.32,
       bold_cols=(0, 3), color_fn=_cfb)
-tb(_s4, .6, 5.72, 6.6, .34, "the 9 applications above 0.25 GB/s", 10.5, False, MUTED)
+tb(_s4, .6, 5.66, 6.6, .34, "the 9 applications above 0.25 GB/s", 10.5, False, MUTED)
 _bx = _s4.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(7.45), Inches(2.40), Inches(5.25), Inches(1.72))
 _bx.fill.solid(); _bx.fill.fore_color.rgb = RGBColor(0xFD, 0xF6, 0xEC); _bx.line.color.rgb = AMBER
 tb(_s4, 7.72, 2.52, 4.75, 1.50,
-   "A correction. An earlier version of this slide reported a 2x over-report and blamed write "
-   "streaming. That compared QEMU's read+write TRANSACTION count against l3d_cache_refill, which is "
-   "a REFILL counter and sees reads only. The gap was the unit, not the emulator.", 11.5, False, INK)
-tb(_s4, 7.45, 4.26, 5.25, .34, "What is genuinely off:", 12, True, INK)
+   "Like for like — QEMU's DRAM READ traffic against the A55's l3d_cache_refill, which is a refill "
+   "counter and sees reads. The streaming workloads, where absolute bandwidth is largest and where "
+   "it therefore matters most for power, agree to within 11%.", 11.5, False, INK)
+tb(_s4, 7.45, 4.26, 5.25, .34, "Where it is genuinely off:", 12, True, INK)
 tb(_s4, 7.45, 4.60, 5.25, 1.40,
-   "Two compute-bound workloads where QEMU's cache model misses too often — mm-big (+149%) and "
+   "Two compute-bound workloads where the modelled cache misses too often — mm-big (+149%) and "
    "rd-life (+84%). Both are small-footprint and reuse-heavy, exactly where a modelled cache and a "
-   "real one diverge most. The streaming workloads, where absolute bandwidth is largest, agree to "
-   "within 11%.", 11.5, False, MUTED)
+   "real one diverge most. Neither moves enough traffic for it to cost more than a few mW.",
+   11.5, False, MUTED)
 tb(_s4, .6, 6.16, 12.1, .84,
    "Both directions matter and neither is large in mW. QEMU also reports 0.000 GB/s for the whole "
    "busybox family where silicon measures real traffic (bb-md5 0.148 GB/s), because QEMU linux-user "
@@ -379,13 +379,35 @@ tb(_s, .6, 6.68, 12.1, .34,
    "Two guesses that were wrong, and worth knowing: YUV→RGB frame conversion is compute-bound (1.4 IPC), "
    "and sparse gather is latency-bound, not bandwidth-bound.", 11, True, ACCENT)
 
+# 11 · every remaining "over-reports ~2x / write streaming" claim is retired.
+#      The real limit is that ONE bandwidth term charges reads and writes alike.
+replace_text(1, "Memory b/w is over-reported by roughly 2x. Bounded, understood, and localized to streaming workloads.",
+             "DRAM read traffic tracks silicon to within 11% on streaming workloads. Reads and writes "
+             "share one term, which is the model's known limit.")
+_lt = tables(10)[0]
+for _r in range(1, len(_lt.rows)):
+    if 'DRAM BANDWIDTH' in _lt.cell(_r, 0).text:
+        set_cell(_lt, _r, 2, "reads track silicon; reads and writes share one coefficient")
+    if 'streaming or DMA-heavy' in _lt.cell(_r, 0).text:
+        set_cell(_lt, _r, 2, "write-heavy streams over-predict 12-13% (measured to 11 GB/s)")
+replace_text(9, "They diverge only on the streaming control (6.5% vs 1.4%), where QEMU's DRAM "
+                 "proxy over-reports bandwidth. Edge workloads run at 0.4–0.7 GB/s and are barely exposed to it.",
+             "They diverge only on the streaming control (6.5% vs 1.4%), where reads and writes are "
+             "charged alike by the model's single bandwidth term. These mixes run at 0.4–0.7 GB/s and "
+             "are barely exposed to it.")
+
+replace_text(4, "Part 1 — Where QEMU does not see the same work",
+             "Part 1 — Bandwidth: where QEMU and silicon differ")
+replace_text(4, "Memory bandwidth. QEMU's DRAM proxy against the A55's l3d_cache_refill counter.",
+             "Memory bandwidth. QEMU's DRAM read traffic against the A55's l3d_cache_refill counter.")
+
 # both new slides land before the closing slide
 reorder([
     "From activity counts",
     "Two questions",
     "What we did",
     "Part 1 — Does QEMU see",
-    "Part 1 — Where QEMU does not",
+    "Part 1 — Bandwidth:",
     "Part 1 — Pushing the bandwidth",
     "Part 2 — The power models",
     "Part 2 — The finding",
