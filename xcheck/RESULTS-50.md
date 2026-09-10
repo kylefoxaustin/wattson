@@ -190,6 +190,40 @@ campaign. It is bandwidth-driven, and bandwidth is what QEMU estimates well
 (`dram_bytes_proxy`, validated to 0.01% in steady state after accounting for
 write streaming).
 
+## What supplied what — and what is still untested
+
+Every prediction in this campaign has the form
+
+    power = c0 + c1*(ALU Mops/s) + c2*(GB/s) + c3*(cores)
+            \_____ measured on silicon _____/  \__ from QEMU __/
+
+**QEMU never produces a milliwatt.** It supplies the activity. Every mW in the
+coefficients was obtained by putting a meter on real rails and regressing over
+an 11-point calibration grid.
+
+That matters for how the result should be read:
+
+| quantity | source here | status |
+|---|---|---|
+| the activity a workload generates | QEMU | **proven** — 1.75% against the A55's own PMU |
+| mW per unit of activity | measured silicon rails | **stood in for the engineers** |
+| mW per unit of activity, *before silicon exists* | gate-level power estimation | **not tested** |
+
+The coefficients came from the one source that is unavailable before tapeout: a
+working part. That is what makes this evidence rather than a proposal — with the
+energy side known-good, any error left over is attributable to the activity
+side, which is the half under test. It is also exactly why this does not
+replace the engineers' power model: pre-silicon there is no rail to measure and
+the coefficients have to come from gate-level estimation instead.
+
+⭐ What this campaign de-risks is the QEMU half, so that when gate-power
+estimates arrive, the activity being fed into them is already known to be
+right. The estimates themselves remain unvalidated by anything here.
+
+⚠️ Wherever this work says a prediction was made "from QEMU", it means no
+silicon *activity counter* was used. It never means watts came out of an
+emulator.
+
 ## What this demonstrates
 
 QEMU predicted the per-rail power of 50 real applications on silicon it never

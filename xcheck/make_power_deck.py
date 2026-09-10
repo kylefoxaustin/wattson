@@ -99,7 +99,8 @@ q=[("1","Can QEMU predict the ACTIVITY a workload generates on silicon?",
     f"Memory bandwidth is over-reported by roughly 2x. Bounded, understood, and localised to streaming workloads."),
    ("2","Can that activity be turned into a POWER number?",
     f"YES \u2014 {st.mean(esum):.1f}% mean error on total power, {max(esum):.1f}% worst, on 50 applications the model never saw.",
-    f"And {st.mean([float(r['err_qemu']) for r in mc if r['case'].startswith('e')]):.1f}% on concurrent multi-application mixes, predicted from QEMU alone.")]
+    f"And {st.mean([float(r['err_qemu']) for r in mc if r['case'].startswith('e')]):.1f}% on concurrent multi-application mixes. "
+    f"In both cases QEMU supplies the activity; the mW-per-unit-activity always comes from measured silicon.")]
 y=1.62
 for n,ques,ans,cav in q:
     box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(y),Inches(12.1),Inches(2.30))
@@ -271,7 +272,8 @@ MFOOT=("wattson power \u00b7 rails MEASURED on IMX95LPD5EVK-19 (NXP BCU) \u00b7 
        "activity DERIVED from QEMU TCG; PMU column MEASURED on silicon \u00b7 2026-09-10")
 s=slide("Part 2 \u2014 A realistic edge workload, all six cores busy",
         "Perception, inference, storage, networking, imaging, rendering, running at the same time. "
-        "Predicted from QEMU alone: no silicon counter is used for these mixes.",foot=MFOOT)
+        "No silicon ACTIVITY counter feeds these predictions \u2014 the activity is QEMU's. "
+        "The energy coefficients, as everywhere in this deck, were measured on silicon.",foot=MFOOT)
 edge=[r for r in mc if r['case'].startswith('e')]
 ctrl=[r for r in mc if not r['case'].startswith('e')]
 eq=[float(r['err_qemu']) for r in edge]
@@ -326,6 +328,39 @@ tb(s,.6,6.60,12.1,.5,"Everything above is reproducible from the repo: frozen pre
    "raw per-app pairs in RESULTS-50.csv, and every limit stated beside the number it qualifies.",11.5,False,MUTED)
 
 
+# ── 11b · anatomy: where the number comes from ─────────────────────────────
+s=slide("Where the number actually comes from",
+        "QEMU never emits a milliwatt. It is worth being precise about which half of the prediction it supplies.")
+eq=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(1.56),Inches(12.1),Inches(1.24))
+eq.fill.solid(); eq.fill.fore_color.rgb=RGBColor(0xF4,0xF7,0xFB); eq.line.color.rgb=ACCENT
+_tf=s.shapes.add_textbox(Inches(.68),Inches(1.70),Inches(11.95),Inches(.5)).text_frame
+_tf.word_wrap=True; _p=_tf.paragraphs[0]; _p.alignment=PP_ALIGN.CENTER
+for _txt,_col in [("power  =  ",INK),("243.8",RED),("  +  ",INK),("0.1266",RED),(" \u00b7 ",INK),
+                  ("ALU Mops/s",GREEN),("  +  ",INK),("60.62",RED),(" \u00b7 ",INK),("GB/s",GREEN),
+                  ("  +  ",INK),("169.3",RED),(" \u00b7 ",INK),("cores",GREEN)]:
+    _r=_p.add_run(); _r.text=_txt; _r.font.size=Pt(17); _r.font.bold=True
+    _r.font.color.rgb=_col; _r.font.name="Verdana"
+tb(s,.9,2.20,5.6,.30,"MEASURED on silicon rails",12,True,RED,PP_ALIGN.CENTER)
+tb(s,.9,2.47,5.6,.28,"mW per unit of activity",10.5,False,MUTED,PP_ALIGN.CENTER)
+tb(s,6.7,2.20,5.6,.30,"DERIVED from QEMU",12,True,GREEN,PP_ALIGN.CENTER)
+tb(s,6.7,2.47,5.6,.28,"the activity itself",10.5,False,MUTED,PP_ALIGN.CENTER)
+d=[("the activity a workload generates","QEMU","proven here","1.75% vs the A55's own PMU, 50 applications"),
+   ("mW per unit of activity","measured silicon rails","stood in for the engineers","11-point calibration grid on a real board"),
+   ("mW per unit of activity, BEFORE silicon exists","gate-level power estimation","NOT tested here","this is the engineers' half, and it is the open link")]
+def cf(ri,c):
+    if c==2: return {"proven here":GREEN,"stood in for the engineers":AMBER}.get(d[ri][2],RED)
+    return None
+table(s,.6,3.06,12.1,(4.0,2.6,2.5,3.0),
+      ("quantity","where it came from","status","basis"),d,fsz=11,rh=.48,bold_cols=(0,2),color_fn=cf)
+box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(5.10),Inches(12.1),Inches(1.30))
+box.fill.solid(); box.fill.fore_color.rgb=RGBColor(0xFD,0xF6,0xEC); box.line.color.rgb=AMBER
+tb(s,.9,5.22,11.5,1.10,"We obtained the coefficients the one way that is unavailable before tapeout: by putting a meter on the "
+   "part. That is what makes this deck evidence \u2014 the energy side was known-good, so any error left over belongs to the "
+   "activity side, which is the half we were actually testing. It is also why this does not replace the engineers: "
+   "pre-silicon there is no rail to measure, and those coefficients have to come from gate-level estimates instead.",12,False,INK)
+tb(s,.6,6.52,12.1,.5,"What this campaign de-risks is the QEMU half \u2014 so that when gate-power estimates arrive, "
+   "the activity being fed into them is already known to be right.",12,True,ACCENT)
+
 # ── 11 · what this means ───────────────────────────────────────────────────
 s=slide("What this actually means","The result is not the point. What it licenses us to do next is the point.")
 pts=[("1","Predicting power on working silicon is not, by itself, worth much.",
@@ -336,8 +371,9 @@ pts=[("1","Predicting power on working silicon is not, by itself, worth much.",
       "enough to stand up a QEMU model and boot a full Linux BSP on it. That is the gate. Not the power work; the model underneath it."),
      ("3","Once that exists, this campaign says both halves work.",
       "QEMU predicts the activity factors \u2014 usable on their own for reading code flows, usage and where the work lands. "
-      "And those activity factors, fed to a power model carrying estimated gate power, produce power estimates that held to "
-      "single digits against real rails.")]
+      "And fed to a power model, those activity factors produced power estimates that held to single digits against real "
+      "rails. The half still to prove is the model itself: here its coefficients were measured on silicon, and pre-tapeout "
+      "they must come from gate-level estimation instead. That is the engineers' half, and it is the remaining risk.")]
 y=1.58
 for n,head,body in pts:
     num=s.shapes.add_shape(MSO_SHAPE.OVAL,Inches(.62),Inches(y+.04),Inches(.62),Inches(.62))
