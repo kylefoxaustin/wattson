@@ -121,10 +121,19 @@ def replace_text(slide_idx, old, new, exact_prefix=False):
                 hit = True
     return hit
 
-def move_slide(frm, to):
+def reorder(order):
+    """Arrange slides so their titles follow `order` (prefix match). Any slide
+    not named keeps its relative position at the end."""
+    cur = titles()
+    idx = []
+    for want in order:
+        for i, t in enumerate(cur):
+            if i not in idx and t.startswith(want): idx.append(i); break
+    idx += [i for i in range(len(cur)) if i not in idx]
     xml = prs.slides._sldIdLst
     ids = list(xml)
-    xml.remove(ids[frm]); xml.insert(to, ids[frm])
+    for e in ids: xml.remove(e)
+    for i in idx: xml.append(ids[i])
 
 def renumber():
     for i, sl in enumerate(prs.slides, 1):
@@ -267,7 +276,7 @@ for _sh in [x for x in prs.slides[8].shapes if x.has_table]:
 _XS = [.6, 4.85, 9.10]
 for _ci, _chunk in enumerate([_allr[0:17], _allr[17:34], _allr[34:50]]):
     _d = [(r['app'][:12], f"{_fv(r,'pred_sum'):.0f}", f"{_fv(r,'meas_sum'):.0f}",
-           f"{_fv(r,'err_sum'):.0f}%", f"{float(_act[r['app']]['silicon_GBps']):.2f}")
+           f"{_fv(r,'err_sum'):.0f}%", f"{float(_act[r['app']]['silicon_read_GBps']):.2f}")
           for r in _chunk]
     def _mk(dd):
         def cf(ri, c):
@@ -284,11 +293,110 @@ for _ci, _chunk in enumerate([_allr[0:17], _allr[17:34], _allr[34:50]]):
 replace_text(8, "GREEN ≤ 8% error   ·   AMBER 8–12%   ·   RED > 12%      — the 8% line is the published bar "
                 "for a good per-rail model, and is this corpus's own p90 (8.3%).",
              "GREEN ≤ 8%  ·  AMBER 8–12%  ·  RED > 12%   (8% = the published bar for a good per-rail model)"
-             "   ·   GB/s = DDR bandwidth, MEASURED on silicon")
+             "   ·   GB/s = DDR read bandwidth, MEASURED on silicon")
+
+
+# 9 · Part 1 bandwidth slide was wrong. It compared QEMU's dram_bytes_proxy
+#     (read+write TRANSACTIONS) against silicon l3d_cache_refill (a REFILL
+#     counter: reads only) and read the difference as a QEMU defect. Like for
+#     like, QEMU's read bandwidth tracks silicon closely on the streaming
+#     workloads. Rebuild the slide on the corrected comparison.
+_a = list(csv.DictReader(open('RESULTS-activity.csv')))
+_hi = sorted([r for r in _a if float(r['silicon_read_GBps']) >= 0.25],
+             key=lambda r: -float(r['silicon_read_GBps']))
+for _sh in [x for x in prs.slides[4].shapes if x.has_table]:
+    drop_shape(4, _sh)
+for _sh in list(prs.slides[4].shapes):
+    if _sh.has_text_frame and ('over-reports DRAM bandwidth' in _sh.text_frame.text
+                               or 'write streaming' in _sh.text_frame.text
+                               or 'only 3 applications' in _sh.text_frame.text
+                               or 'Why the power result survives' in _sh.text_frame.text
+                               or 'those are the only' in _sh.text_frame.text.lower()):
+        drop_shape(4, _sh)
+_s4 = prs.slides[4]
+_bd = _s4.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(.6), Inches(1.62), Inches(12.1), Inches(.60))
+_bd.fill.solid(); _bd.fill.fore_color.rgb = GREEN; _bd.line.fill.background()
+tb(_s4, .9, 1.70, 11.6, .46, "Compared like for like, QEMU's DRAM read traffic tracks the silicon.",
+   17, True, WHITE)
+_d = [(r['app'], f"{float(r['qemu_read_GBps']):.2f}", f"{float(r['silicon_read_GBps']):.2f}",
+       f"{float(r['read_err']):+.0f}%") for r in _hi]
+def _cfb(ri, c):
+    if c == 3:
+        v = abs(float(_d[ri][3].rstrip('%')))
+        return GREEN if v <= 25 else (AMBER if v <= 60 else RED)
+    return None
+table(_s4, .6, 2.40, 6.6, (1.9, 1.6, 1.6, 1.5),
+      ("application", "QEMU reads", "silicon reads", "error"), _d, fsz=11, rh=.36,
+      bold_cols=(0, 3), color_fn=_cfb)
+tb(_s4, .6, 5.72, 6.6, .34, "the 9 applications above 0.25 GB/s", 10.5, False, MUTED)
+_bx = _s4.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(7.45), Inches(2.40), Inches(5.25), Inches(1.72))
+_bx.fill.solid(); _bx.fill.fore_color.rgb = RGBColor(0xFD, 0xF6, 0xEC); _bx.line.color.rgb = AMBER
+tb(_s4, 7.72, 2.52, 4.75, 1.50,
+   "A correction. An earlier version of this slide reported a 2x over-report and blamed write "
+   "streaming. That compared QEMU's read+write TRANSACTION count against l3d_cache_refill, which is "
+   "a REFILL counter and sees reads only. The gap was the unit, not the emulator.", 11.5, False, INK)
+tb(_s4, 7.45, 4.26, 5.25, .34, "What is genuinely off:", 12, True, INK)
+tb(_s4, 7.45, 4.60, 5.25, 1.40,
+   "Two compute-bound workloads where QEMU's cache model misses too often — mm-big (+149%) and "
+   "rd-life (+84%). Both are small-footprint and reuse-heavy, exactly where a modelled cache and a "
+   "real one diverge most. The streaming workloads, where absolute bandwidth is largest, agree to "
+   "within 11%.", 11.5, False, MUTED)
+tb(_s4, .6, 6.16, 12.1, .84,
+   "Both directions matter and neither is large in mW. QEMU also reports 0.000 GB/s for the whole "
+   "busybox family where silicon measures real traffic (bb-md5 0.148 GB/s), because QEMU linux-user "
+   "models only the application's own accesses while the PMU counts everything on the core, kernel "
+   "included. Worth under 9 mW.", 11, False, ACCENT)
+
+# 10 · the bandwidth corner: a new slide, because the corpus never went there
+_bw = list(csv.DictReader(open('RESULTS-bandwidth.csv')))
+_s = new_slide("Part 1 — Pushing the bandwidth corner",
+               "The 50 applications top out at 0.60 GB/s for a real workload, but the model is fitted to 14 GB/s. "
+               "These were written to occupy that gap.")
+_e = [float(r['err_pct']) for r in _bw]
+_bn = _s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(.6), Inches(1.72), Inches(12.1), Inches(.60))
+_bn.fill.solid(); _bn.fill.fore_color.rgb = ACCENT; _bn.line.fill.background()
+tb(_s, .9, 1.80, 11.6, .46, "Exercised to 11 GB/s — 18x the corpus maximum. It holds on reads, and breaks on writes.",
+   17, True, WHITE)
+_dd = [(r['workload'], f"{float(r['GBps']):.2f}", f"{float(r['aluMps']):.0f}",
+        f"{float(r['pred_mW']):.0f}", f"{float(r['meas_mW']):.0f}", f"{float(r['err_pct']):.1f}%")
+       for r in sorted(_bw, key=lambda r: -float(r['GBps']))]
+def _cf(ri, c):
+    if c == 5:
+        v = float(_dd[ri][5].rstrip('%'))
+        return GREEN if v <= 8 else (AMBER if v <= 15 else RED)
+    return None
+table(_s, .6, 2.50, 12.1, (4.5, 1.35, 1.45, 1.5, 1.5, 1.8),
+      ("workload", "GB/s", "ALU M/s", "pred mW", "meas mW", "err"), _dd, fsz=11.5, rh=.44,
+      bold_cols=(0, 5), color_fn=_cf)
+_b2 = _s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(.6), Inches(5.10), Inches(12.1), Inches(1.44))
+_b2.fill.solid(); _b2.fill.fore_color.rgb = RGBColor(0xFD, 0xF6, 0xEC); _b2.line.color.rgb = AMBER
+tb(_s, .9, 5.22, 11.5, 1.24,
+   "And it found the model's edge. A pure READ stream at 5.5 GB/s predicts to 1.3%. A 50/50 "
+   "read+write stream at 11 GB/s over-predicts by 12–13%. The model carries ONE bandwidth term, so a "
+   "byte written and a byte read are charged the same power — and a written byte evidently costs "
+   "less. Nothing in the 50-app corpus was write-heavy enough to expose that.", 12, False, INK)
+tb(_s, .6, 6.68, 12.1, .34,
+   "Two guesses that were wrong, and worth knowing: YUV→RGB frame conversion is compute-bound (1.4 IPC), "
+   "and sparse gather is latency-bound, not bandwidth-bound.", 11, True, ACCENT)
 
 # both new slides land before the closing slide
-move_slide(12, 11)   # anatomy   -> index 11
-move_slide(13, 12)   # replaces  -> index 12
+reorder([
+    "From activity counts",
+    "Two questions",
+    "What we did",
+    "Part 1 — Does QEMU see",
+    "Part 1 — Where QEMU does not",
+    "Part 1 — Pushing the bandwidth",
+    "Part 2 — The power models",
+    "Part 2 — The finding",
+    "Part 2 — The blind test",
+    "Part 2 — All fifty",
+    "Part 2 — Several apps",
+    "What this licenses",
+    "Where the number actually",
+    "What this actually replaces",
+    "What this actually means",
+])
 renumber()
 prs.save(DECK)
 print(f"{DECK} — {len(prs.slides._sldIdLst)} slides")

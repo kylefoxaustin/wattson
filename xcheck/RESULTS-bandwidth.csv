@@ -1,0 +1,6 @@
+case,workload,GBps,aluMps,pred_mW,meas_mW,err_pct,iters_per_s
+bw_reduce,reduce 256MB — array reduction,5.47,512,1774,1797,1.3,20.36
+bw_blit,blit 256MB — large memcpy,10.85,283,2180,1947,12.0,20.21
+bw_blit_sm,blit 4MB — large memcpy (replicate),11.12,290,2203,1944,13.3,1325.71
+bw_spmv,spmv 64MB — sparse gather,0.47,18,1305,1330,1.9,0.42
+bw_yuv,yuv 1080p — YUV420→RGB565,0.22,855,1393,1456,4.3,29.45
