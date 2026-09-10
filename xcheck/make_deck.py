@@ -125,7 +125,7 @@ tb(s,.6,6.50,12.1,.4,"afgen/afgen.sh my-apps.manifest afs/   →   one JSON per 
 tb(s,.6,6.92,12.1,.32,"Fifty apps in, fifty activity factors out. wattson supplies the counts; energy coefficients stay yours.",12,False,MUTED)
 
 # ── 3 · recommendation: the gate-AF bridge ───────────────────────────────────
-s=slide("Recommendation — the gate-activity bridge")
+s=slide("Recommendation — the gate-activity bridge  (superseded by the next three slides)")
 tb(s,.6,1.14,12.2,.34,"Your spreadsheet wants a GATE activity factor. QEMU measures UTILIZATION. The bridge is a number you already have.",12.5,True)
 
 lft=[("your model","fraction of gates toggling per clock: 0% / 3% / 5% / 7%. 5% = block maxed out. Assumed per block."),
@@ -147,6 +147,76 @@ table(s,.6,4.70,12.1,(0.5,4.3,7.3),("#","step","what it means"),rec,fsz=10,rh=0.
 
 tb(s,.6,6.74,12.1,.36,"THE TURN-AROUND: today you assume 3% and get the power of an abstraction. Name an application instead — "
    "\"what does Pac-Man cost?\" — and get the power of that application.",12,True,GREEN)
+
+# ---------------------------------------------------------------- MEASURED ----
+# The three slides below replace a promise with coefficients. Everything on them
+# was measured on IMX95LPD5EVK-19 silicon on 2026-09-09 with NXP BCU per-rail
+# shunts, against workloads driven from QEMU's own TCG-plugin counts.
+s=slide("The bridge, now measured — per-rail models from QEMU activity")
+band=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(.6),Inches(1.14),Inches(12.1),Inches(.66))
+band.fill.solid(); band.fill.fore_color.rgb=RGBColor(0x0E,0x5C,0x2B); band.line.fill.background()
+tb(s,.9,1.24,11.6,.44,"No longer a recommendation. Measured on i.MX 95 silicon, driven from QEMU counts.",18,True,WHITE)
+
+box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(2.02),Inches(12.1),Inches(1.55))
+box.fill.solid(); box.fill.fore_color.rgb=ZEBRA; box.line.color.rgb=ACCENT; box.line.width=Pt(1.5)
+tb(s,.9,2.14,11.5,.36,"vdd_soc  =  851.0  +  20.4 × GB/s",17,True,ACCENT,font="Consolas")
+tb(s,.9,2.56,11.5,.36,"vdd_arm  =  243.8  +  0.1266 × ALU Mops/s  +  60.6 × GB/s  +  169.3 × active_cores",17,True,ACCENT,font="Consolas")
+tb(s,.9,3.04,11.5,.40,"mW.  vdd_soc holds at BOTH 900 and 1800 MHz unchanged.  vdd_arm is 1800 MHz; it scales 2.21× per 2× clock.",12,False,INK)
+
+acc=[("vdd_soc","2.5 – 7 %","both OPPs, transfers unchanged","bandwidth only — no clock term needed"),
+     ("vdd_arm","4 – 5 %","1800 MHz, out-of-sample","needs ALU rate, bandwidth AND active cores"),
+     ("AF_idle","n = 5, spread ≤1.7 %","1139.5 mW total","vdd_soc 822.6 · vdd_arm 144.6")]
+table(s,.6,3.76,12.1,(1.9,2.4,3.9,3.9),("rail","accuracy","scope","what it needs"),acc,fsz=10.5,rh=0.42,bold_cols=(0,))
+
+tb(s,.6,5.42,12.1,.36,"Driven by QEMU's counters, not the board's: QEMU-fed and PMU-fed predictions agree to 0.1 % "
+   "(644.1 vs 644.9 mW). QEMU supplies activity; the board supplies time.",12,True,GREEN)
+tb(s,.6,5.88,12.1,.34,"Published per-rail models land at single-digit error; under 3 % on unseen workloads is a reason to "
+   "distrust your own validation set. These are inside that band.",11,False,MUTED)
+
+# ------------------------------------------------------------------ THE TURN ---
+s=slide("The finding that changes the activity factor")
+tb(s,.6,1.14,12.2,.34,"We expected instruction count to drive core power. It does not.",13,True)
+
+box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(1.66),Inches(12.1),Inches(1.30))
+box.fill.solid(); box.fill.fore_color.rgb=ZEBRA; box.line.color.rgb=RGBColor(0xB0,0x30,0x20); box.line.width=Pt(1.5)
+tb(s,.9,1.80,11.5,.40,"instructions alone:  R² = 0.031",19,True,RGBColor(0xB0,0x30,0x20),font="Consolas")
+tb(s,.9,2.24,11.5,.36,"bandwidth alone:     R² = 0.784        both together:  R² = 0.990",15,True,ACCENT,font="Consolas")
+tb(s,.9,2.62,11.5,.30,"Instruction count explains 3 % of core-rail power on this part.",12,True,INK)
+
+ev=[("the observation","a memory-stalling workload drew 1.6× the core power of a compute workload retiring MORE instructions"),
+    ("why","a stalled core still burns clock trees, speculation, replayed loads, prefetchers and the L2/bus interface"),
+    ("independent check","Walker et al. (TCAD 2017) regressed PMCs against ODROID-XU3 per-cluster rails: retired instruction "
+     "count is NOT in their model either, and their memory workloads top the cluster rail"),
+    ("consequence","an AF built on instruction count alone MIS-RANKS exactly the workloads that matter")]
+table(s,.6,3.16,12.1,(2.3,9.8),("aspect","detail"),ev,fsz=10.5,rh=0.52,bold_cols=(0,))
+
+tb(s,.6,5.60,12.1,.36,"Active cores matter independently of throughput: 598 Mops/s across two cores drew 656 mW; "
+   "599 Mops/s on ONE core drew 465 mW. Same work, 40 % less power.",12,True,GREEN)
+
+# --------------------------------------------------------------- VALIDATION ---
+s=slide("Does QEMU's activity match the silicon's own counters?")
+tb(s,.6,1.14,12.2,.34,"Same deterministic static binary, run under perf on the EVK and under qemu-aarch64 with TCG plugins.",12.5,True)
+
+cv=[("instructions retired","1,201,601,070","1,200,039,789","0.1 %","essentially exact"),
+    ("instructions (memory workload)","213,267,051","205,561,916","3.6 %","exact enough"),
+    ("cache misses, steady state","4,283,525","4,194,709","0.01 %","after write streaming"),
+    ("cache misses, incl. buffer init","4,283,525","5,243,303","+22 %","un-modelled write streaming")]
+table(s,.6,1.72,12.1,(3.5,2.6,2.6,1.5,1.9),("counter","silicon PMU","QEMU","Δ","note"),cv,fsz=10,rh=0.44,bold_cols=(0,))
+
+tb(s,.6,3.86,12.1,.34,"The +22 % is not a bias. It is exactly one pass over the buffer (1,048,576 lines = 64 MiB / 64 B), "
+   "CONSTANT to 6 counts while the workload quadruples.",12,True,INK)
+tb(s,.6,4.28,12.1,.34,"The A55 detects full-cache-line writes and uses WRITE STREAMING, skipping the read-for-ownership. "
+   "QEMU's cache plugin has no such notion, so it counts allocations the hardware never makes.",11.5,False,INK)
+
+lim=[("known sign","QEMU always over-counts; a ceiling, not a mystery"),
+     ("scope","affects full-line write patterns: memset, memcpy, page zeroing, buffer init"),
+     ("today's fits","unaffected — the measured workloads are steady-state streaming"),
+     ("fixable","full-line writes are detectable in the plugin; a legitimate upstream contribution")]
+table(s,.6,4.86,12.1,(2.3,9.8),("aspect","detail"),lim,fsz=10.5,rh=0.42,bold_cols=(0,))
+
+tb(s,.6,6.74,12.1,.36,"So the emulator half is sound: instruction counts exact, miss counts exact in steady state, "
+   "and one identified gap with a known sign.",12,True,GREEN)
+
 
 # ── 4 · what we can hand over ────────────────────────────────────────────────
 s=slide("Three levels of detail — all available today")
