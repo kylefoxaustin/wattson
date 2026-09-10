@@ -354,12 +354,44 @@ table(s,.6,3.06,12.1,(4.0,2.6,2.5,3.0),
       ("quantity","where it came from","status","basis"),d,fsz=11,rh=.48,bold_cols=(0,2),color_fn=cf)
 box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(5.10),Inches(12.1),Inches(1.30))
 box.fill.solid(); box.fill.fore_color.rgb=RGBColor(0xFD,0xF6,0xEC); box.line.color.rgb=AMBER
-tb(s,.9,5.22,11.5,1.10,"We obtained the coefficients the one way that is unavailable before tapeout: by putting a meter on the "
-   "part. That is what makes this deck evidence \u2014 the energy side was known-good, so any error left over belongs to the "
-   "activity side, which is the half we were actually testing. It is also why this does not replace the engineers: "
-   "pre-silicon there is no rail to measure, and those coefficients have to come from gate-level estimates instead.",12,False,INK)
+tb(s,.9,5.22,11.5,1.10,"In a real program that middle row is a power-estimation spreadsheet. Here we stood in for it by having "
+   "the actual silicon. That is what makes this evidence rather than a proposal \u2014 with the energy side known-good, any "
+   "error left over belongs to the activity side, which is the half under test. It is also why this does not replace "
+   "the engineers: before tapeout there is no rail to measure, and the coefficients come from their estimates instead.",12,False,INK)
 tb(s,.6,6.52,12.1,.5,"What this campaign de-risks is the QEMU half \u2014 so that when gate-power estimates arrive, "
    "the activity being fed into them is already known to be right.",12,True,ACCENT)
+
+# ── 12b · what this replaces ───────────────────────────────────────────────
+s=slide("What this actually replaces","A power estimate is two numbers multiplied together. Only one of them has ever had a way to get better.")
+rowsv=[("gate power per toggle","the engineers' power-estimation spreadsheet",
+        "Wide error bars early, and everyone knows it \u2014 but it REFINES as the design matures. Synthesis, then place-and-route, then silicon.",GREEN,"refines over time"),
+       ("activity factor","a flat assumption: 1%, 2%, 3%, 5%, 10%",
+        "Does not refine. Nothing connects a toggle rate to a workload, so there is no mechanism by which the guess improves.",RED,"never refines")]
+y=1.60
+for name,src,body,col,tag in rowsv:
+    box=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.6),Inches(y),Inches(12.1),Inches(1.42))
+    box.fill.solid(); box.fill.fore_color.rgb=RGBColor(0xF7,0xF8,0xFA); box.line.color.rgb=col
+    tb(s,.92,y+.14,5.2,.36,name,16,True,INK)
+    tb(s,.92,y+.54,5.2,.34,src,12,False,MUTED)
+    chip=s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,Inches(.92),Inches(y+.94),Inches(2.3),Inches(.34))
+    chip.fill.solid(); chip.fill.fore_color.rgb=col; chip.line.fill.background()
+    tb(s,.92,y+.98,2.3,.28,tag,10.5,True,WHITE,PP_ALIGN.CENTER)
+    tb(s,6.35,y+.20,6.1,1.05,body,12,False,INK)
+    y+=1.56
+bx=s.shapes.add_shape(MSO_SHAPE.RECTANGLE,Inches(.6),Inches(4.74),Inches(12.1),Inches(.60))
+bx.fill.solid(); bx.fill.fore_color.rgb=INK; bx.line.fill.background()
+tb(s,.9,4.82,11.6,.46,"How do you correlate a 3% toggling assumption to a real use case? You cannot \u2014 there has been no instrument for it.",15,True,WHITE)
+tb(s,.6,5.46,12.1,.32,"That is the gap this closes:",12,True,INK)
+d=[("name an application","get its activity factor, per workload, with a stated error against silicon"),
+   ("change the code","see the activity factor move, and by how much"),
+   ("compare two use cases","on the same measured basis, not two different guesses")]
+for i,(a_,b_) in enumerate(d):
+    yy=5.80+i*.34
+    dot=s.shapes.add_shape(MSO_SHAPE.OVAL,Inches(.72),Inches(yy+.07),Inches(.16),Inches(.16))
+    dot.fill.solid(); dot.fill.fore_color.rgb=ACCENT; dot.line.fill.background()
+    tb(s,1.02,yy,3.3,.32,a_,12,True,INK)
+    tb(s,4.15,yy,8.5,.32,b_,12,False,MUTED)
+tb(s,.6,6.84,12.1,.3,"The spreadsheet keeps its job. It just stops being multiplied by a number nobody can trace to anything.",11.5,True,ACCENT)
 
 # ── 11 · what this means ───────────────────────────────────────────────────
 s=slide("What this actually means","The result is not the point. What it licenses us to do next is the point.")
