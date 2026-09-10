@@ -256,3 +256,56 @@ track `vdd_arm`: a stalling memory workload burned 1.6x the core power of a
 workload retiring more instructions. Any AF built on instruction count alone
 will mis-rank these two workloads. The vector already carries `data_misses`
 and `dram_transactions_est`; the core model likely needs them, not just insns.
+
+---
+
+## P4 — UNBLOCKED. Root cause found on silicon.
+
+Ran `bench-wfi-diag` on the EVK (same SoC as the FRDM, and its console is
+reliable where the FRDM's bridge kept serving stale buffer). Provenance
+**MEASURED** on IMX95LPD5EVK-19, 2026-09-10.
+
+| register | QEMU (passing) | **silicon** |
+|---|---|---|
+| `IGROUPR0` | `0x04000000` | **`0x00000000`** |
+| `ISENABLER0` | `0x04000000` | `0x04000000` |
+| `ICC_IGRPEN1_EL1` | 1 | 1 |
+| `ICC_SRE_EL2` | 0xf | 0xf |
+| `CNTFRQ_EL0` | 24 MHz | 24 MHz |
+| `CNTHP_CTL` ISTATUS | SET | **SET** |
+| WFI | **WOKE** | **HANGS** |
+
+### The mechanism
+
+Everything works except one write. The timer **fires** (`ISTATUS` set). The
+interrupt is **enabled** (`ISENABLER0` bit 26). The CPU interface has **Group 1
+enabled**. But `IGROUPR0` reads back **zero**: our non-secure write to move
+PPI 26 into Group 1 was **silently discarded**, so the interrupt stays in
+**Group 0** — and a CPU interface with only Group 1 enabled never receives it.
+WFI sleeps forever.
+
+**ATF owns PPI 26 as a Secure Group 0 interrupt on real firmware.** QEMU accepted
+the identical write because it models no secure GIC state and runs no ATF, so
+the sequence passed there and failed here.
+
+⭐ This is row 1 of the decision table written into the runbook BEFORE the run:
+*"`IGROUPR0` reads back 0 → ATF owns PPI 26 as Secure Group 0; our NS write is
+discarded → switch to PSCI `CPU_SUSPEND`, or use CNTP/PPI 30."* Fixing the
+interpretation in advance is what made a one-shot run conclusive instead of a
+starting point for rationalisation.
+
+### What P4 needs to actually run
+
+1. **PSCI `CPU_SUSPEND`** — the sanctioned idle path on real firmware, and what
+   Linux cpuidle uses. ATF then owns the GIC/timer plumbing we are failing to do
+   by hand from EL2. Also the more faithful experiment: a bare WFI is a shallow
+   halt, while `CPU_SUSPEND` drives real power-domain transitions through the SM
+   — which is the thing P4 is trying to measure.
+2. Or the **EL1 physical timer (CNTP, PPI 30)** — Linux drives it successfully on
+   this board, so it is demonstrably available to non-secure software.
+
+⚠️ Not a QEMU bug so much as a fidelity gap: QEMU's GICv3 has no secure/non-secure
+ownership model for PPIs, so it will accept any group assignment. **A guest
+sequence validated only under QEMU can be wrong about interrupt ownership on
+silicon** — which is exactly the class of thing this emulator exists to catch,
+and did not.
