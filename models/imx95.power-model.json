@@ -1,0 +1,42 @@
+{
+  "schema": "wattson/power-model/v1",
+  "part": "i.MX 95",
+  "provenance": "MEASURED",
+  "conditions": {
+    "freq_mhz": 1800,
+    "voltage_domain": "vdd_arm+vdd_soc",
+    "temperature_c": 40.5,
+    "process_corner": null
+  },
+  "blocks": {
+    "a55_complex": {
+      "static_mw": 243.8,
+      "terms": [
+        { "activity_key": "cores.alu_mops_per_s", "unit": "Mops/s",
+          "coeff_mw_per_unit": 0.1266, "valid_range": [0, 900] },
+        { "activity_key": "memory.dram_gbytes_per_s", "unit": "GB/s",
+          "coeff_mw_per_unit": 60.62, "valid_range": [0, 14.1],
+          "note": "one term for reads and writes combined. Validated to 1.3% on a pure read stream at 5.5 GB/s; over-predicts 12-13% on a 50/50 read+write stream at 11 GB/s, because a written byte is charged the same as a read byte and evidently costs less. Splitting this into read and write coefficients is the known next refinement." },
+        { "activity_key": "cores.active_cores", "unit": "cores",
+          "coeff_mw_per_unit": 169.3, "valid_range": [1, 6] }
+      ]
+    },
+    "soc_interconnect": {
+      "static_mw": 851.0,
+      "terms": [
+        { "activity_key": "cores.alu_mops_per_s", "unit": "Mops/s",
+          "coeff_mw_per_unit": 0.0043, "valid_range": [0, 900] },
+        { "activity_key": "memory.dram_gbytes_per_s", "unit": "GB/s",
+          "coeff_mw_per_unit": 20.40, "valid_range": [0, 14.1] }
+      ]
+    },
+    "enetc": {
+      "static_mw": 8.0,
+      "terms": [
+        { "activity_key": "peripherals.enetc.throughput_gbps", "unit": "Gbps",
+          "coeff_mw_per_unit": 99.0, "valid_range": [0, 0.9],
+          "note": "lands on vdd_soc. Direction-insensitive (103 mW/Gbps TX, 87 RX), so one term covers both; R^2 0.884 pooled over 6 points. This is the MAC, PHY interface, SerDes and NoC path - it is NOT DRAM traffic, and the dram term accounts for only ~2 mW of the ~90 mW measured at 900 Mbps. The CPU cost of the network stack is already covered by cores.active_cores and must not be counted again here. Measured at 1 GbE only: whether the coefficient is truly per-bit is untested at 2.5G/10G." }
+      ]
+    }
+  }
+}

@@ -4,19 +4,34 @@
   "title": "wattson activity vector",
   "description": "DERIVED functional-activity counts from a QEMU run. NOT measured silicon power, NOT watts. The activity (alpha) half of P = sum(energy_per_event * event_count); the energy half is supplied by the power team's model.",
   "type": "object",
-  "required": ["schema", "workload", "provenance", "activity"],
+  "required": [
+    "schema",
+    "workload",
+    "provenance",
+    "activity"
+  ],
   "properties": {
-    "schema": { "const": "wattson/activity-vector/v1" },
-    "workload": { "type": "string", "description": "workload label" },
+    "schema": {
+      "const": "wattson/activity-vector/v1"
+    },
+    "workload": {
+      "type": "string",
+      "description": "workload label"
+    },
     "provenance": {
       "type": "string",
       "description": "must state DERIVED-from-QEMU; never 'measured silicon'"
     },
-    "note": { "type": "string" },
+    "note": {
+      "type": "string"
+    },
     "timing": {
       "type": "object",
       "description": "THE TIME BASE. The counts in `activity` are TOTALS; power is a RATE, and a total cannot be converted to a rate without a duration. Omitting this made the vector unable to predict power at all - only energy over a whole run. wall_ns is HOST wall time for the QEMU run, which is NOT guest time and NOT silicon time: it is the denominator for a host-side rate and a sanity check on run-to-run variance, nothing more. Use it to normalise two runs to equal duration; do NOT present anything derived from it as a silicon rate.",
-      "required": ["wall_ns", "wall_ns_provenance"],
+      "required": [
+        "wall_ns",
+        "wall_ns_provenance"
+      ],
       "properties": {
         "wall_ns": {
           "type": "integer",
@@ -27,30 +42,48 @@
           "description": "must say the clock is HOST wall time under TCG, not guest or silicon time"
         },
         "guest_insn_rate_est": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "description": "total_insns / (wall_ns/1e9). A HOST throughput figure for the emulation, NOT the silicon's instruction rate - TCG is not cycle-accurate. Present only as an emulation-speed diagnostic."
         }
       }
     },
     "activity": {
       "type": "object",
-      "required": ["cores"],
+      "required": [
+        "cores"
+      ],
       "properties": {
         "cores": {
           "type": "object",
           "properties": {
-            "count_seen": { "type": "integer" },
-            "count_active": { "type": "integer" },
+            "count_seen": {
+              "type": "integer"
+            },
+            "count_active": {
+              "type": "integer"
+            },
             "insns_by_cpu": {
               "type": "object",
               "description": "cpu index -> instructions retired (active cores only)",
-              "additionalProperties": { "type": "integer" }
+              "additionalProperties": {
+                "type": "integer"
+              }
             },
-            "total_insns": { "type": ["integer", "null"] },
+            "total_insns": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
             "active_fraction_by_cpu": {
               "type": "object",
               "description": "P1: cpu index -> active/(active+halted) duty cycle in [0,1]",
-              "additionalProperties": { "type": "number" }
+              "additionalProperties": {
+                "type": "number"
+              }
             }
           }
         },
@@ -58,15 +91,41 @@
           "type": "object",
           "description": "from the functional cache plugin; misses are the DRAM-transaction proxy",
           "properties": {
-            "data_accesses": { "type": "integer" },
-            "data_misses": { "type": "integer" },
-            "dmiss_rate": { "type": "number" },
-            "insn_accesses": { "type": "integer" },
-            "insn_misses": { "type": "integer" },
-            "imiss_rate": { "type": "number" },
-            "dram_transactions_est": { "type": "integer" },
-            "dram_bytes_est": { "type": "integer" },
-            "line_bytes": { "type": "integer" }
+            "data_accesses": {
+              "type": "integer"
+            },
+            "data_misses": {
+              "type": "integer"
+            },
+            "dmiss_rate": {
+              "type": "number"
+            },
+            "insn_accesses": {
+              "type": "integer"
+            },
+            "insn_misses": {
+              "type": "integer"
+            },
+            "imiss_rate": {
+              "type": "number"
+            },
+            "dram_transactions_est": {
+              "type": "integer"
+            },
+            "dram_bytes_est": {
+              "type": "integer"
+            },
+            "line_bytes": {
+              "type": "integer"
+            },
+            "dram_read_bytes_est": {
+              "type": "integer",
+              "description": "DRAM READ bytes (line allocations). Kept separate from writes because they do not cost the same: an i.MX 95 model with a single combined bandwidth term predicted a pure read stream to 1.3% and over-predicted a 50/50 read+write stream by 12-13%. Also the only quantity comparable to an ARM l3d_cache_refill counter, which is a REFILL counter and sees reads only."
+            },
+            "dram_write_bytes_est": {
+              "type": "integer",
+              "description": "DRAM WRITE bytes (writebacks plus write-streaming stores)."
+            }
           }
         },
         "accelerators": {
@@ -75,8 +134,50 @@
           "additionalProperties": {
             "type": "object",
             "properties": {
-              "active_fraction": { "type": "number" },
-              "jobs": { "type": "integer" }
+              "active_fraction": {
+                "type": "number"
+              },
+              "jobs": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "peripherals": {
+          "type": "object",
+          "description": "Device-initiated DMA and link activity. NOT visible to TCG plugins: every plugin callback is qemu_plugin_register_vcpu_* and takes a CPUState, so an access with no vCPU behind it cannot enter that API. These counts come from the device models or from the address_space read/write trace events. This block is not optional detail - on i.MX 95 a 1 GbE link costs ~99 mW/Gbps on vdd_soc where the DRAM-bytes term accounts for ~2 mW, and display scanout at 1920x1200x60 moves 0.553 GB/s that no CPU ever issues.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "dma_read_bytes": {
+                "type": "integer",
+                "description": "bytes this device read from memory"
+              },
+              "dma_write_bytes": {
+                "type": "integer",
+                "description": "bytes this device wrote to memory"
+              },
+              "throughput_gbps": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": "link-layer throughput where the block has a link (network, display, USB). Often a better predictor than DMA bytes: the MAC, PHY and SerDes cost scales with the link, not with memory traffic."
+              },
+              "active_fraction": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": "fraction of wall time the block was active, in [0,1]"
+              },
+              "channel_bytes": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "description": "optional per-channel split, e.g. scanout vs blit, or descriptor vs payload. Descriptor and payload traffic scale differently with frame size and only payload tracks throughput."
+              }
             }
           }
         }

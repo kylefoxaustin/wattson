@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "wattson/power-model/v1",
+  "title": "wattson power model",
+  "description": "The ENERGY half of P = sum(energy_per_event * event_count). Supplied by the power team, NOT by QEMU. QEMU never emits a milliwatt: it emits the activity vector (wattson/activity-vector/v1) and this document says what each unit of that activity costs. Coefficients come either from measured silicon rails or, before tapeout, from gate-level estimation - which one is a required field, because a DERIVED coefficient and a MEASURED one may not be compared as if they were the same kind of number.",
+  "type": "object",
+  "required": ["schema", "part", "provenance", "conditions", "blocks"],
+  "properties": {
+    "schema": { "const": "wattson/power-model/v1" },
+    "part": {
+      "type": "string",
+      "description": "silicon this model describes, e.g. 'i.MX 95'. A model is not portable across parts: the coefficients embed process, library and microarchitecture."
+    },
+    "provenance": {
+      "type": "string",
+      "enum": ["MEASURED", "GATE_ESTIMATE", "MIXED"],
+      "description": "MEASURED: fitted to real rails on real silicon. GATE_ESTIMATE: from synthesis/netlist power estimation, pre-tapeout. MIXED: some blocks each way, in which case every block MUST carry its own provenance."
+    },
+    "conditions": {
+      "type": "object",
+      "description": "The conditions the coefficients were obtained under. A coefficient is only valid here. Frequency in particular does NOT transfer - refitting an i.MX 95 core model at 900 MHz produced different coefficients with different signs, not a scaled version of the 1800 MHz set.",
+      "required": ["freq_mhz", "voltage_domain"],
+      "properties": {
+        "freq_mhz": { "type": "number" },
+        "voltage_domain": { "type": "string", "description": "rail these coefficients are expressed on, e.g. 'vdd_arm'" },
+        "temperature_c": { "type": ["number", "null"], "description": "die temperature; leakage is temperature-dependent and QEMU models none of it" },
+        "process_corner": { "type": ["string", "null"] }
+      }
+    },
+    "blocks": {
+      "type": "object",
+      "description": "block name -> its power terms. Block names MUST match the names used in the activity vector, since the two documents are joined on them.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["static_mw", "terms"],
+        "properties": {
+          "provenance": {
+            "type": ["string", "null"],
+            "enum": ["MEASURED", "GATE_ESTIMATE", null],
+            "description": "required when the model-level provenance is MIXED"
+          },
+          "static_mw": {
+            "type": "number",
+            "description": "always-on cost when the block is powered but idle. Counted ONCE per block - summing a whole-system idle figure per block is the classic way to over-design a thermal solution by 3x."
+          },
+          "terms": {
+            "type": "array",
+            "description": "linear terms. P_block = static_mw + sum(coeff * activity[activity_key]).",
+            "items": {
+              "type": "object",
+              "required": ["activity_key", "unit", "coeff_mw_per_unit"],
+              "properties": {
+                "activity_key": {
+                  "type": "string",
+                  "description": "dotted path into the activity vector, e.g. 'peripherals.enetc.throughput_gbps'. The join is on this exact key: a coefficient fitted against DRAM READ traffic must name a read key, so that feeding it total read+write traffic fails loudly instead of silently over-predicting."
+                },
+                "unit": {
+                  "type": "string",
+                  "description": "unit of the activity quantity, e.g. 'Gbps', 'GB/s', 'Mops/s', 'cores', 'fraction'. Checked against the activity vector's declared unit; a mismatch is an error, not a warning."
+                },
+                "coeff_mw_per_unit": { "type": "number" },
+                "valid_range": {
+                  "type": ["array", "null"],
+                  "description": "[min, max] of the activity quantity over which the coefficient was obtained. Predicting outside it is extrapolation and must be reported as such - an i.MX 95 core model fitted to 14 GB/s held to 1.3% on a read stream at 5.5 GB/s but over-predicted 12-13% on a write-heavy stream, because one bandwidth term charges reads and writes alike.",
+                  "items": { "type": "number" }
+                },
+                "note": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
